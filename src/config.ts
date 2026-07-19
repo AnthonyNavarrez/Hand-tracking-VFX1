@@ -1,9 +1,10 @@
 // Tunables for hand tracking, mirroring, and lens behavior.
-// Placeholder values for Phase 0 — wired up as later phases consume them.
 
 export const config = {
   numHands: 2,
   mirror: true,
-  smoothingFactor: 0.5,
+  // Per-frame lerp factor (0-1) each lens corner moves toward its latest
+  // tracked position. Lower = smoother/more lag, higher = snappier/more jitter.
+  smoothingFactor: 0.25,
   fewerThanTwoHandsBehavior: "hide" as const,
 };

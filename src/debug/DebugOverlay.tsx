@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type RefObject } from 'react';
 import type { HandLandmarkerResult } from '@mediapipe/tasks-vision';
 import type { Corners } from '../tracking/types';
+import { landmarkToScreen, type Size } from '../tracking/corners';
 
 const HAND_DOT_COLORS = ['rgba(0, 229, 255, 0.5)', 'rgba(255, 47, 208, 0.5)'];
 const CORNER_COLORS = ['#ff3b3b', '#3bff6a', '#3b9bff', '#ffae3b']; // LT, LI, RI, RT
@@ -10,9 +11,10 @@ type DebugOverlayProps = {
   videoRef: RefObject<HTMLVideoElement | null>;
   result: HandLandmarkerResult | null;
   corners: Corners | null;
+  videoSize: Size | null;
 };
 
-export function DebugOverlay({ videoRef, result, corners }: DebugOverlayProps) {
+export function DebugOverlay({ videoRef, result, corners, videoSize }: DebugOverlayProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [visible, setVisible] = useState(true);
 
@@ -45,12 +47,12 @@ export function DebugOverlay({ videoRef, result, corners }: DebugOverlayProps) {
 
     if (!visible) return;
 
-    if (result) {
+    if (result && videoSize) {
+      const stageSize = { width: rect.width, height: rect.height };
       result.landmarks.forEach((landmarks, handIndex) => {
         ctx.fillStyle = HAND_DOT_COLORS[handIndex % HAND_DOT_COLORS.length];
         landmarks.forEach((landmark) => {
-          const x = (1 - landmark.x) * rect.width;
-          const y = landmark.y * rect.height;
+          const { x, y } = landmarkToScreen(landmark, videoSize, stageSize);
           ctx.beginPath();
           ctx.arc(x, y, 3, 0, Math.PI * 2);
           ctx.fill();
@@ -84,7 +86,7 @@ export function DebugOverlay({ videoRef, result, corners }: DebugOverlayProps) {
         ctx.fillText(CORNER_LABELS[i], corner.x, corner.y - 14);
       });
     }
-  }, [result, corners, visible, videoRef]);
+  }, [result, corners, visible, videoRef, videoSize]);
 
   return <canvas ref={canvasRef} className="debug-overlay" />;
 }

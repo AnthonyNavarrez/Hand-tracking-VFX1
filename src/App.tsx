@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { Canvas } from '@react-three/fiber';
 import { useWebcam } from './hooks/useWebcam';
 import { useHandLandmarker } from './hooks/useHandLandmarker';
-import { useContainedSize } from './hooks/useContainedSize';
+import { useWindowSize } from './hooks/useWindowSize';
 import { DebugOverlay } from './debug/DebugOverlay';
 import { LensQuad } from './scene/LensQuad';
 import { getCorners } from './tracking/corners';
@@ -13,9 +13,8 @@ function App() {
   const { videoRef, isReady, error, videoSize } = useWebcam();
   const handResult = useHandLandmarker(videoRef, isReady);
 
-  const aspectRatio = videoSize ? videoSize.width / videoSize.height : null;
-  const stageSize = useContainedSize(aspectRatio);
-  const corners = getCorners(handResult, stageSize.width, stageSize.height);
+  const stageSize = useWindowSize();
+  const corners = getCorners(handResult, videoSize, stageSize);
 
   const [videoTexture, setVideoTexture] = useState<THREE.VideoTexture | null>(null);
 
@@ -29,11 +28,20 @@ function App() {
     };
   }, [isReady, videoRef]);
 
+  // Once corners have been seen at least once, keep LensQuad mounted for
+  // the rest of the session — it fades itself out via its own opacity
+  // uniform when hands leave, rather than mounting/unmounting (which would
+  // pop instead of fade, and churn geometry/material needlessly).
+  const [hasTrackedOnce, setHasTrackedOnce] = useState(false);
+  useEffect(() => {
+    if (corners) setHasTrackedOnce(true);
+  }, [corners]);
+
   return (
     <div className="app">
-      <div className="stage" style={{ width: stageSize.width, height: stageSize.height }}>
+      <div className="stage">
         <video ref={videoRef} className="webcam-video" autoPlay muted playsInline />
-        {videoTexture && (
+        {videoTexture && videoSize && (
           <Canvas
             style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none' }}
             orthographic
@@ -44,10 +52,14 @@ function App() {
             camera={{ position: [0, 0, 10], near: 0.1, far: 1000 }}
             gl={{ alpha: true }}
           >
-            {corners && <LensQuad corners={corners} videoTexture={videoTexture} />}
+            {hasTrackedOnce && (
+              <LensQuad targetCorners={corners} videoTexture={videoTexture} videoSize={videoSize} />
+            )}
           </Canvas>
         )}
-        {isReady && <DebugOverlay videoRef={videoRef} result={handResult} corners={corners} />}
+        {isReady && (
+          <DebugOverlay videoRef={videoRef} result={handResult} corners={corners} videoSize={videoSize} />
+        )}
       </div>
       {error && <div className="status status-error">Camera error: {error}</div>}
       {!isReady && !error && <div className="status">Requesting camera access…</div>}

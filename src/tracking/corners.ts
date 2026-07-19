@@ -1,12 +1,29 @@
 import type { HandLandmarkerResult, NormalizedLandmark } from '@mediapipe/tasks-vision';
-import type { Corners } from './types';
+import type { Corner, Corners } from './types';
 
 const THUMB_TIP = 4;
 const INDEX_TIP = 8;
 
-function toScreen(landmark: NormalizedLandmark, width: number, height: number) {
-  // Mirror x to match the CSS-flipped (selfie-view) video, per DECISION.
-  return { x: (1 - landmark.x) * width, y: landmark.y * height };
+export type Size = { width: number; height: number };
+
+/**
+ * Maps a normalized landmark to screen/canvas space (CSS px, top-left
+ * origin), accounting for the `object-fit: cover` crop between the video's
+ * native resolution and the (differently-aspect-ratioed) stage, plus the
+ * mirror flip for the CSS-flipped (selfie-view) video, per DECISION.
+ */
+export function landmarkToScreen(landmark: NormalizedLandmark, videoSize: Size, stageSize: Size): Corner {
+  const scale = Math.max(stageSize.width / videoSize.width, stageSize.height / videoSize.height);
+  const displayedWidth = videoSize.width * scale;
+  const displayedHeight = videoSize.height * scale;
+  const offsetX = (displayedWidth - stageSize.width) / 2;
+  const offsetY = (displayedHeight - stageSize.height) / 2;
+
+  const mirroredX = 1 - landmark.x;
+  return {
+    x: mirroredX * displayedWidth - offsetX,
+    y: landmark.y * displayedHeight - offsetY,
+  };
 }
 
 /**
@@ -17,10 +34,10 @@ function toScreen(landmark: NormalizedLandmark, width: number, height: number) {
  */
 export function getCorners(
   result: HandLandmarkerResult | null,
-  width: number,
-  height: number,
+  videoSize: Size | null,
+  stageSize: Size,
 ): Corners | null {
-  if (!result || width === 0 || height === 0) return null;
+  if (!result || !videoSize || stageSize.width === 0 || stageSize.height === 0) return null;
 
   let leftHand: NormalizedLandmark[] | null = null;
   let rightHand: NormalizedLandmark[] | null = null;
@@ -34,9 +51,9 @@ export function getCorners(
   if (!leftHand || !rightHand) return null;
 
   return [
-    toScreen(leftHand[THUMB_TIP], width, height),
-    toScreen(leftHand[INDEX_TIP], width, height),
-    toScreen(rightHand[INDEX_TIP], width, height),
-    toScreen(rightHand[THUMB_TIP], width, height),
+    landmarkToScreen(leftHand[THUMB_TIP], videoSize, stageSize),
+    landmarkToScreen(leftHand[INDEX_TIP], videoSize, stageSize),
+    landmarkToScreen(rightHand[INDEX_TIP], videoSize, stageSize),
+    landmarkToScreen(rightHand[THUMB_TIP], videoSize, stageSize),
   ];
 }
