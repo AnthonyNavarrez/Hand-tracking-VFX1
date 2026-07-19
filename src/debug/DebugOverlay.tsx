@@ -1,16 +1,18 @@
 import { useEffect, useRef, useState, type RefObject } from 'react';
 import type { HandLandmarkerResult } from '@mediapipe/tasks-vision';
+import type { Corners } from '../tracking/types';
 
-const HAND_COLORS = ['#00e5ff', '#ff2fd0'];
-const HIGHLIGHT_COLOR = '#ffe600';
-const HIGHLIGHTED_LANDMARKS = new Set([4, 8]);
+const HAND_DOT_COLORS = ['rgba(0, 229, 255, 0.5)', 'rgba(255, 47, 208, 0.5)'];
+const CORNER_COLORS = ['#ff3b3b', '#3bff6a', '#3b9bff', '#ffae3b']; // LT, LI, RI, RT
+const CORNER_LABELS = ['LT', 'LI', 'RI', 'RT'];
 
 type DebugOverlayProps = {
   videoRef: RefObject<HTMLVideoElement | null>;
   result: HandLandmarkerResult | null;
+  corners: Corners | null;
 };
 
-export function DebugOverlay({ videoRef, result }: DebugOverlayProps) {
+export function DebugOverlay({ videoRef, result, corners }: DebugOverlayProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [visible, setVisible] = useState(true);
 
@@ -41,27 +43,48 @@ export function DebugOverlay({ videoRef, result }: DebugOverlayProps) {
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, rect.width, rect.height);
 
-    if (!visible || !result) return;
+    if (!visible) return;
 
-    result.landmarks.forEach((landmarks, handIndex) => {
-      const color = HAND_COLORS[handIndex % HAND_COLORS.length];
-      landmarks.forEach((landmark, landmarkIndex) => {
-        const x = (1 - landmark.x) * rect.width;
-        const y = landmark.y * rect.height;
-        const highlighted = HIGHLIGHTED_LANDMARKS.has(landmarkIndex);
-
-        ctx.beginPath();
-        ctx.arc(x, y, highlighted ? 8 : 4, 0, Math.PI * 2);
-        ctx.fillStyle = highlighted ? HIGHLIGHT_COLOR : color;
-        ctx.fill();
-        if (highlighted) {
-          ctx.lineWidth = 2;
-          ctx.strokeStyle = '#000';
-          ctx.stroke();
-        }
+    if (result) {
+      result.landmarks.forEach((landmarks, handIndex) => {
+        ctx.fillStyle = HAND_DOT_COLORS[handIndex % HAND_DOT_COLORS.length];
+        landmarks.forEach((landmark) => {
+          const x = (1 - landmark.x) * rect.width;
+          const y = landmark.y * rect.height;
+          ctx.beginPath();
+          ctx.arc(x, y, 3, 0, Math.PI * 2);
+          ctx.fill();
+        });
       });
-    });
-  }, [result, visible, videoRef]);
+    }
+
+    if (corners) {
+      ctx.beginPath();
+      corners.forEach((corner, i) => {
+        if (i === 0) ctx.moveTo(corner.x, corner.y);
+        else ctx.lineTo(corner.x, corner.y);
+      });
+      ctx.closePath();
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      corners.forEach((corner, i) => {
+        ctx.beginPath();
+        ctx.arc(corner.x, corner.y, 9, 0, Math.PI * 2);
+        ctx.fillStyle = CORNER_COLORS[i];
+        ctx.fill();
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = '#000';
+        ctx.stroke();
+
+        ctx.font = 'bold 14px system-ui, sans-serif';
+        ctx.fillStyle = '#000';
+        ctx.textAlign = 'center';
+        ctx.fillText(CORNER_LABELS[i], corner.x, corner.y - 14);
+      });
+    }
+  }, [result, corners, visible, videoRef]);
 
   return <canvas ref={canvasRef} className="debug-overlay" />;
 }
