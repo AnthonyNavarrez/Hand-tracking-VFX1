@@ -13,6 +13,7 @@ type LensQuadProps = {
 };
 
 const FADE_FACTOR = 0.15;
+const EFFECT_MIX_FACTOR = 0.2;
 
 function lerp(a: number, b: number, t: number) {
   return a + (b - a) * t;
@@ -55,6 +56,20 @@ export function LensQuad({ targetCorners, videoTexture, videoSize }: LensQuadPro
           uStageSize: { value: new THREE.Vector2() },
           uVideoSize: { value: new THREE.Vector2(videoSize.width, videoSize.height) },
           uOpacity: { value: 0 },
+          uEffectMix: { value: 0 },
+          uPixelSize: { value: config.pixelateBlockSize },
+          uDitherMix: { value: 0 },
+          uDitherLevels: { value: config.ditherLevels },
+          uDitherCellSize: { value: config.ditherCellSize },
+          uAberrationMix: { value: 0 },
+          uAberrationOffset: { value: config.aberrationOffset },
+          uAberrationCenter: { value: new THREE.Vector2() },
+          uTime: { value: 0 },
+          uAberrationDistortFrequency: { value: config.aberrationDistortFrequency },
+          uAberrationDistortSpeed: { value: config.aberrationDistortSpeed },
+          uAberrationDistortAmplitude: { value: config.aberrationDistortAmplitude },
+          uPosterizeMix: { value: 0 },
+          uPosterizeLevels: { value: config.posterizeLevels },
         },
       }),
     [videoTexture, videoSize.width, videoSize.height],
@@ -77,8 +92,18 @@ export function LensQuad({ targetCorners, videoTexture, videoSize }: LensQuadPro
   // in LensQuad's material shrinks the quad's opacity from its last known
   // position rather than snapping it away.
   const smoothedCornersRef = useRef<Corners | null>(null);
+  const effectMixRef = useRef(0);
+  const isRightPinchTouchingRef = useRef(false);
+  const pixelateEnabledRef = useRef(false);
+  const ditherMixRef = useRef(0);
+  const isLeftPinchTouchingRef = useRef(false);
+  const ditherEnabledRef = useRef(false);
+  const aberrationMixRef = useRef(0);
+  const posterizeMixRef = useRef(0);
 
-  useFrame(() => {
+  useFrame((state) => {
+    material.uniforms.uTime.value = state.clock.elapsedTime;
+
     if (targetCorners) {
       const prev = smoothedCornersRef.current;
       smoothedCornersRef.current = prev
@@ -95,9 +120,73 @@ export function LensQuad({ targetCorners, videoTexture, videoSize }: LensQuadPro
     const smoothed = smoothedCornersRef.current;
     if (!smoothed) return;
 
+    const [lt, li, ri, rt] = smoothed;
+
+    // RI/RT pinch (right index + thumb touching) toggles the fill between
+    // invert and pixelated invert on each touch — like a tap, not a hold.
+    // Hysteresis (separate on/off thresholds) means one physical touch
+    // can't double-toggle from jitter right at the boundary: crossing the
+    // (closer) on-distance fires the toggle and arms "touching"; crossing
+    // back out past the (farther) off-distance disarms it, ready for the
+    // next tap.
+    const rightPinchDistance = Math.hypot(ri.x - rt.x, ri.y - rt.y);
+    const { pixelatePinchOnDistance, pixelatePinchOffDistance } = config;
+    if (!isRightPinchTouchingRef.current && rightPinchDistance < pixelatePinchOnDistance) {
+      isRightPinchTouchingRef.current = true;
+      pixelateEnabledRef.current = !pixelateEnabledRef.current;
+    } else if (isRightPinchTouchingRef.current && rightPinchDistance > pixelatePinchOffDistance) {
+      isRightPinchTouchingRef.current = false;
+    }
+
+    const targetMix = pixelateEnabledRef.current ? 1 : 0;
+    effectMixRef.current = lerp(effectMixRef.current, targetMix, EFFECT_MIX_FACTOR);
+    material.uniforms.uEffectMix.value = effectMixRef.current;
+
+    // LI/LT pinch (left index + thumb touching) toggles an ordered-dither
+    // fill the same tap-to-switch way, independently of the pixelate
+    // toggle above — both can be on at once.
+    const leftPinchDistance = Math.hypot(lt.x - li.x, lt.y - li.y);
+    const { ditherPinchOnDistance, ditherPinchOffDistance } = config;
+    if (!isLeftPinchTouchingRef.current && leftPinchDistance < ditherPinchOnDistance) {
+      isLeftPinchTouchingRef.current = true;
+      ditherEnabledRef.current = !ditherEnabledRef.current;
+    } else if (isLeftPinchTouchingRef.current && leftPinchDistance > ditherPinchOffDistance) {
+      isLeftPinchTouchingRef.current = false;
+    }
+
+    const targetDitherMix = ditherEnabledRef.current ? 1 : 0;
+    ditherMixRef.current = lerp(ditherMixRef.current, targetDitherMix, EFFECT_MIX_FACTOR);
+    material.uniforms.uDitherMix.value = ditherMixRef.current;
+
+    // Chromatic aberration is a held pose (not a tap): active exactly
+    // while both thumbs sit above their own hand's index tip by at least
+    // the configured margin. Smoothly fades in/out with the pose rather
+    // than popping, same as the opacity show/hide fade.
+    const { aberrationPoseMargin } = config;
+    const rightThumbAboveIndex = ri.y - rt.y > aberrationPoseMargin;
+    const leftThumbAboveIndex = li.y - lt.y > aberrationPoseMargin;
+    const targetAberrationMix = rightThumbAboveIndex && leftThumbAboveIndex ? 1 : 0;
+    aberrationMixRef.current = lerp(aberrationMixRef.current, targetAberrationMix, EFFECT_MIX_FACTOR);
+    material.uniforms.uAberrationMix.value = aberrationMixRef.current;
+    material.uniforms.uAberrationCenter.value.set(
+      (lt.x + li.x + ri.x + rt.x) / 4,
+      (lt.y + li.y + ri.y + rt.y) / 4,
+    );
+
+    // Posterize is a held pose (not a tap): active exactly while the
+    // hands are crossed — the right hand's corners sitting at least the
+    // configured margin to the left of the left hand's corners. Stacks
+    // on top of whichever fill (invert or aberration) is active.
+    const { posterizeCrossMargin } = config;
+    const rightHandCenterX = (ri.x + rt.x) / 2;
+    const leftHandCenterX = (li.x + lt.x) / 2;
+    const handsCrossed = rightHandCenterX < leftHandCenterX - posterizeCrossMargin;
+    const targetPosterizeMix = handsCrossed ? 1 : 0;
+    posterizeMixRef.current = lerp(posterizeMixRef.current, targetPosterizeMix, EFFECT_MIX_FACTOR);
+    material.uniforms.uPosterizeMix.value = posterizeMixRef.current;
+
     const position = geometry.attributes.position as THREE.BufferAttribute;
     const arr = position.array as Float32Array;
-    const [lt, li, ri, rt] = smoothed;
     const set = (i: number, p: { x: number; y: number }) => {
       arr[i * 3] = p.x;
       arr[i * 3 + 1] = p.y;
