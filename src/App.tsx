@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { Canvas } from '@react-three/fiber';
 import { useWebcam } from './hooks/useWebcam';
@@ -6,7 +6,10 @@ import { useHandLandmarker } from './hooks/useHandLandmarker';
 import { useWindowSize } from './hooks/useWindowSize';
 import { DebugOverlay } from './debug/DebugOverlay';
 import { LensQuad } from './scene/LensQuad';
+import { LensSphere } from './scene/LensSphere';
+import { SphereModeMix } from './scene/SphereModeMix';
 import { getCorners } from './tracking/corners';
+import { useRightPinkyExtended } from './tracking/gestures';
 import './App.css';
 
 function App() {
@@ -15,6 +18,8 @@ function App() {
 
   const stageSize = useWindowSize();
   const corners = getCorners(handResult, videoSize, stageSize);
+  const rightPinkyExtended = useRightPinkyExtended(handResult);
+  const sphereModeMixRef = useRef(0);
 
   const [videoTexture, setVideoTexture] = useState<THREE.VideoTexture | null>(null);
 
@@ -52,13 +57,26 @@ function App() {
             camera={{ position: [0, 0, 10], near: 0.1, far: 1000 }}
             gl={{ alpha: true }}
           >
+            <SphereModeMix rightPinkyExtended={rightPinkyExtended} mixRef={sphereModeMixRef} />
             {hasTrackedOnce && (
-              <LensQuad targetCorners={corners} videoTexture={videoTexture} videoSize={videoSize} />
+              <LensQuad
+                targetCorners={corners}
+                videoTexture={videoTexture}
+                videoSize={videoSize}
+                sphereModeMixRef={sphereModeMixRef}
+              />
             )}
+            <LensSphere targetCorners={corners} videoTexture={videoTexture} sphereModeMixRef={sphereModeMixRef} />
           </Canvas>
         )}
         {isReady && (
-          <DebugOverlay videoRef={videoRef} result={handResult} corners={corners} videoSize={videoSize} />
+          <DebugOverlay
+            videoRef={videoRef}
+            result={handResult}
+            corners={corners}
+            videoSize={videoSize}
+            rightPinkyExtended={rightPinkyExtended}
+          />
         )}
       </div>
       {error && <div className="status status-error">Camera error: {error}</div>}

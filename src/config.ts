@@ -47,4 +47,16 @@ export const config = {
   // whichever fill (invert or aberration) is currently active.
   posterizeCrossMargin: 30,
   posterizeLevels: 3, // grayscale tone bands; lower = bolder/more graphic
+
+  // Right pinky raised is a held pose, detected from the ratio of
+  // (pinky tip-to-MCP distance) / (wrist-to-middle-MCP distance) — scale-
+  // normalized so it works at any distance from the camera, and rotation-
+  // agnostic since it's a 3D distance ratio, not a Y-position check.
+  // Hysteresis (on > off) so the boundary doesn't flicker.
+  pinkyExtendedOnRatio: 0.75,
+  pinkyExtendedOffRatio: 0.55,
+
+  // Sphere radius (screen px) = average corner-to-centroid distance of the
+  // 4 smoothed corners, scaled by this factor.
+  sphereRadiusScale: 1,
 };

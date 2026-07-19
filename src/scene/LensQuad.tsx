@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, type RefObject } from 'react';
 import * as THREE from 'three';
 import { useFrame, useThree } from '@react-three/fiber';
 import { vertexShader, fragmentShader } from './lensShader';
@@ -10,16 +10,28 @@ type LensQuadProps = {
   targetCorners: Corners | null;
   videoTexture: THREE.VideoTexture;
   videoSize: Size;
+  // Shared 0-1 crossfade value (1 = fully sphere mode) owned by
+  // SphereModeMix — multiplies this quad's own hands-visible opacity so
+  // it fades out as LensSphere fades in. At 0 (right pinky never raised)
+  // this is a no-op multiplier, so existing behavior is unchanged.
+  sphereModeMixRef: RefObject<number>;
 };
 
 const FADE_FACTOR = 0.15;
 const EFFECT_MIX_FACTOR = 0.2;
+// The mix lerp asymptotically approaches 1 but never mathematically
+// reaches it, so opacity alone never hits exactly 0 in full sphere mode —
+// a residual near-zero-alpha quad can still show through against the
+// sphere depending on transparent-object draw order. Fully hide the mesh
+// once the crossfade has visually finished (opacity is already
+// imperceptibly low at this point, so this isn't a pop).
+const SPHERE_MODE_HIDE_THRESHOLD = 0.98;
 
 function lerp(a: number, b: number, t: number) {
   return a + (b - a) * t;
 }
 
-export function LensQuad({ targetCorners, videoTexture, videoSize }: LensQuadProps) {
+export function LensQuad({ targetCorners, videoTexture, videoSize, sphereModeMixRef }: LensQuadProps) {
   const { camera, size, viewport } = useThree();
 
   // Map the orthographic camera 1:1 to screen-space pixels, top-left
@@ -86,12 +98,15 @@ export function LensQuad({ targetCorners, videoTexture, videoSize }: LensQuadPro
     return geo;
   }, []);
 
+  const meshRef = useRef<THREE.Mesh>(null);
+
   // Smoothed corner positions persist across frames (a ref, not state) so
   // useFrame can lerp them every render frame regardless of how often new
   // tracking data arrives. Frozen (not reset) when hands leave, so the fade
   // in LensQuad's material shrinks the quad's opacity from its last known
   // position rather than snapping it away.
   const smoothedCornersRef = useRef<Corners | null>(null);
+  const handsOpacityRef = useRef(0);
   const effectMixRef = useRef(0);
   const isRightPinchTouchingRef = useRef(false);
   const pixelateEnabledRef = useRef(false);
@@ -115,7 +130,9 @@ export function LensQuad({ targetCorners, videoTexture, videoSize }: LensQuadPro
     }
 
     const targetOpacity = targetCorners ? 1 : 0;
-    material.uniforms.uOpacity.value = lerp(material.uniforms.uOpacity.value, targetOpacity, FADE_FACTOR);
+    handsOpacityRef.current = lerp(handsOpacityRef.current, targetOpacity, FADE_FACTOR);
+    material.uniforms.uOpacity.value = handsOpacityRef.current * (1 - sphereModeMixRef.current);
+    if (meshRef.current) meshRef.current.visible = sphereModeMixRef.current < SPHERE_MODE_HIDE_THRESHOLD;
 
     const smoothed = smoothedCornersRef.current;
     if (!smoothed) return;
@@ -202,5 +219,5 @@ export function LensQuad({ targetCorners, videoTexture, videoSize }: LensQuadPro
     position.needsUpdate = true;
   });
 
-  return <mesh geometry={geometry} material={material} frustumCulled={false} />;
+  return <mesh ref={meshRef} geometry={geometry} material={material} frustumCulled={false} />;
 }
