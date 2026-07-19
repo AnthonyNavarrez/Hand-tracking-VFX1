@@ -7,7 +7,6 @@ import { useContainedSize } from './hooks/useContainedSize';
 import { DebugOverlay } from './debug/DebugOverlay';
 import { LensQuad } from './scene/LensQuad';
 import { getCorners } from './tracking/corners';
-import type { Corners } from './tracking/types';
 import './App.css';
 
 function App() {
@@ -30,15 +29,6 @@ function App() {
     };
   }, [isReady, videoRef]);
 
-  // Phase 4: a fixed rectangle to de-risk the shader before wiring it to
-  // tracked hands in Phase 5.
-  const staticCorners: Corners = [
-    { x: stageSize.width * 0.25, y: stageSize.height * 0.75 },
-    { x: stageSize.width * 0.25, y: stageSize.height * 0.25 },
-    { x: stageSize.width * 0.75, y: stageSize.height * 0.25 },
-    { x: stageSize.width * 0.75, y: stageSize.height * 0.75 },
-  ];
-
   return (
     <div className="app">
       <div className="stage" style={{ width: stageSize.width, height: stageSize.height }}>
@@ -54,7 +44,7 @@ function App() {
             camera={{ position: [0, 0, 10], near: 0.1, far: 1000 }}
             gl={{ alpha: true }}
           >
-            <LensQuad corners={staticCorners} videoTexture={videoTexture} />
+            {corners && <LensQuad corners={corners} videoTexture={videoTexture} />}
           </Canvas>
         )}
         {isReady && <DebugOverlay videoRef={videoRef} result={handResult} corners={corners} />}
