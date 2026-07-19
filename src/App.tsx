@@ -1,12 +1,22 @@
 import { useWebcam } from './hooks/useWebcam';
+import { useHandLandmarker } from './hooks/useHandLandmarker';
+import { useContainedSize } from './hooks/useContainedSize';
+import { DebugOverlay } from './debug/DebugOverlay';
 import './App.css';
 
 function App() {
-  const { videoRef, isReady, error } = useWebcam();
+  const { videoRef, isReady, error, videoSize } = useWebcam();
+  const handResult = useHandLandmarker(videoRef, isReady);
+
+  const aspectRatio = videoSize ? videoSize.width / videoSize.height : null;
+  const stageSize = useContainedSize(aspectRatio);
 
   return (
     <div className="app">
-      <video ref={videoRef} className="webcam-video" autoPlay muted playsInline />
+      <div className="stage" style={{ width: stageSize.width, height: stageSize.height }}>
+        <video ref={videoRef} className="webcam-video" autoPlay muted playsInline />
+        {isReady && <DebugOverlay videoRef={videoRef} result={handResult} />}
+      </div>
       {error && <div className="status status-error">Camera error: {error}</div>}
       {!isReady && !error && <div className="status">Requesting camera access…</div>}
     </div>

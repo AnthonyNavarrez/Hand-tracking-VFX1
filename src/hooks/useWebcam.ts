@@ -4,6 +4,7 @@ export function useWebcam() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [isReady, setIsReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [videoSize, setVideoSize] = useState<{ width: number; height: number } | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -21,6 +22,7 @@ export function useWebcam() {
         });
         if (cancelled) return;
 
+        setVideoSize({ width: video.videoWidth, height: video.videoHeight });
         await video.play();
         setIsReady(true);
       } catch (err) {
@@ -38,5 +40,5 @@ export function useWebcam() {
     };
   }, []);
 
-  return { videoRef, isReady, error };
+  return { videoRef, isReady, error, videoSize };
 }
