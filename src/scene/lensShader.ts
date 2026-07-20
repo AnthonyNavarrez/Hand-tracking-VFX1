@@ -15,7 +15,7 @@ export const fragmentShader = /* glsl */ `
   uniform float uDitherMix;   // 0 = none, 1 = full dither (LI/LT pinch toggle)
   uniform float uDitherLevels; // quantization levels per color channel
   uniform float uDitherCellSize; // CSS px per Bayer matrix cell
-  uniform float uAberrationMix;   // 0 = normal invert, 1 = chromatic aberration, no invert (both thumbs above indices)
+  uniform float uAberrationMix;   // 0 = normal invert, 1 = chromatic aberration, no invert (left thumb above left index)
   uniform float uAberrationOffset; // max R/B channel sample split at the quad's edge, CSS px
   uniform vec2 uAberrationCenter;  // lens quad center, CSS px, mirrored screen space
   uniform float uTime;
@@ -24,6 +24,10 @@ export const fragmentShader = /* glsl */ `
   uniform float uAberrationDistortAmplitude;
   uniform float uPosterizeMix;    // 0 = none, 1 = full posterize (hands crossed)
   uniform float uPosterizeLevels; // tone bands (luminance-based, grayscale)
+  uniform float uSaturationMix;   // 0 = none, 1 = full super-saturation + hue shift (LI/RI touch toggle)
+  uniform float uSaturationBoost; // multiplier on the HSV saturation channel
+  uniform float uSaturationHueShift; // hue rotation, fraction of the full wheel (0-1)
+  uniform float uFisheyeStrength; // barrel-distortion strength, fades in/out with uSaturationMix
 
   vec2 toSampleUV(vec2 screenUV, vec2 displayedSize, vec2 offset) {
     return (screenUV * uStageSize + offset) / displayedSize;
@@ -60,6 +64,48 @@ export const fragmentShader = /* glsl */ `
     float steps = max(uPosterizeLevels - 1.0, 1.0);
     float quantized = floor(luminance * steps + 0.5) / steps;
     return vec3(clamp(quantized, 0.0, 1.0));
+  }
+
+  // Standard RGB<->HSV conversion (no branching, hash-free) so saturation
+  // and hue can be manipulated independently of the color's brightness.
+  vec3 rgb2hsv(vec3 c) {
+    vec4 K = vec4(0.0, -1.0 / 3.0, 2.0 / 3.0, -1.0);
+    vec4 p = mix(vec4(c.bg, K.wz), vec4(c.gb, K.xy), step(c.b, c.g));
+    vec4 q = mix(vec4(p.xyw, c.r), vec4(c.r, p.yzx), step(p.x, c.r));
+    float d = q.x - min(q.w, q.y);
+    float e = 1.0e-10;
+    return vec3(abs(q.z + (q.w - q.y) / (6.0 * d + e)), d / (q.x + e), q.x);
+  }
+
+  vec3 hsv2rgb(vec3 c) {
+    vec4 K = vec4(1.0, 2.0 / 3.0, 1.0 / 3.0, 3.0);
+    vec3 p = abs(fract(c.xxx + K.xyz) * 6.0 - K.www);
+    return c.z * mix(K.xxx, clamp(p - K.xxx, 0.0, 1.0), c.y);
+  }
+
+  // Super-saturation + slight hue shift: boosts the HSV saturation
+  // channel well past 1 (clamped) for a punchy, oversaturated look, and
+  // rotates hue slightly so it also reads as a color *shift*, not just
+  // more-of-the-same-color.
+  vec3 superSaturate(vec3 color) {
+    vec3 hsv = rgb2hsv(color);
+    hsv.x = fract(hsv.x + uSaturationHueShift);
+    hsv.y = clamp(hsv.y * uSaturationBoost, 0.0, 1.0);
+    return hsv2rgb(hsv);
+  }
+
+  // Fisheye/barrel distortion: pushes the sample point radially outward
+  // from the lens's own center, scaled by (normalized distance)^2, so the
+  // center stays near-undistorted while the edges bulge outward like a
+  // wide-angle POV lens. Mixed in by the caller so it fades in/out with
+  // whatever's driving it.
+  vec2 fisheyeWarp(vec2 uv, vec2 centerPx, float strength) {
+    vec2 fromCenterPx = uv * uStageSize - centerPx;
+    float halfExtent = max(uStageSize.x, uStageSize.y) * 0.5;
+    vec2 normalized = fromCenterPx / halfExtent;
+    float r2 = dot(normalized, normalized);
+    vec2 distortedPx = normalized * (1.0 + strength * r2) * halfExtent + centerPx;
+    return distortedPx / uStageSize;
   }
 
   // Chromatic aberration: sample R/G/B at screen UVs split radially
@@ -103,6 +149,13 @@ export const fragmentShader = /* glsl */ `
 
     vec2 mirroredScreenUV = vec2(1.0 - screenUV.x, screenUV.y);
 
+    // Fisheye POV: kicks in together with the super-saturation toggle
+    // (same LI/RI touch), warping the sample point before anything else
+    // reads it so pixelation/invert/aberration/dither all see the
+    // distorted view too.
+    vec2 fisheyeScreenUV = fisheyeWarp(mirroredScreenUV, uAberrationCenter, uFisheyeStrength);
+    mirroredScreenUV = mix(mirroredScreenUV, fisheyeScreenUV, uSaturationMix);
+
     // Pixelation: quantize screen UV to a coarse grid (CSS px, so block
     // size stays consistent on screen regardless of video crop/scale)
     // before mapping into video space. Both the invert and aberration
@@ -121,10 +174,14 @@ export const fragmentShader = /* glsl */ `
 
     vec3 baseColor = mix(invertColor, aberrationColor, uAberrationMix);
 
-    // Posterize and dither each stack independently on top of whichever
-    // fill resulted above, regardless of invert/aberration/pixelate state.
-    vec3 posterizedColor = posterize(baseColor);
-    vec3 postPosterizeColor = mix(baseColor, posterizedColor, uPosterizeMix);
+    // Super-saturation, posterize, and dither each stack independently on
+    // top of whichever fill resulted above, regardless of
+    // invert/aberration/pixelate state.
+    vec3 saturatedColor = superSaturate(baseColor);
+    vec3 postSaturationColor = mix(baseColor, saturatedColor, uSaturationMix);
+
+    vec3 posterizedColor = posterize(postSaturationColor);
+    vec3 postPosterizeColor = mix(postSaturationColor, posterizedColor, uPosterizeMix);
 
     vec3 ditheredColor = orderedDither(postPosterizeColor, mirroredScreenUV);
     vec3 finalColor = mix(postPosterizeColor, ditheredColor, uDitherMix);

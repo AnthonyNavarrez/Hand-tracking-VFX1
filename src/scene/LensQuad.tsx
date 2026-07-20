@@ -10,28 +10,33 @@ type LensQuadProps = {
   targetCorners: Corners | null;
   videoTexture: THREE.VideoTexture;
   videoSize: Size;
-  // Shared 0-1 crossfade value (1 = fully sphere mode) owned by
-  // SphereModeMix — multiplies this quad's own hands-visible opacity so
-  // it fades out as LensSphere fades in. At 0 (right pinky never raised)
-  // this is a no-op multiplier, so existing behavior is unchanged.
-  sphereModeMixRef: RefObject<number>;
+  // Right pinky raised hides this mesh immediately (no fade) — the
+  // sphere's own entrance fade (see LensSphere/SphereModeMix) still reads
+  // as smooth, but the quad shouldn't linger while it fades out. At false
+  // (right pinky never raised) this is a no-op, so existing behavior is
+  // unchanged.
+  rightPinkyExtended: boolean;
+  // Shared 0-1 crossfade value (1 = fully particle-field mode) owned by
+  // HandOpenMix — multiplies this quad's own opacity so it fades out as
+  // ParticleField's squares fade in. At 0 (left hand never opened) this
+  // is a no-op multiplier.
+  handOpenMixRef: RefObject<number>;
 };
 
 const FADE_FACTOR = 0.15;
 const EFFECT_MIX_FACTOR = 0.2;
-// The mix lerp asymptotically approaches 1 but never mathematically
-// reaches it, so opacity alone never hits exactly 0 in full sphere mode —
-// a residual near-zero-alpha quad can still show through against the
-// sphere depending on transparent-object draw order. Fully hide the mesh
-// once the crossfade has visually finished (opacity is already
-// imperceptibly low at this point, so this isn't a pop).
-const SPHERE_MODE_HIDE_THRESHOLD = 0.98;
 
 function lerp(a: number, b: number, t: number) {
   return a + (b - a) * t;
 }
 
-export function LensQuad({ targetCorners, videoTexture, videoSize, sphereModeMixRef }: LensQuadProps) {
+export function LensQuad({
+  targetCorners,
+  videoTexture,
+  videoSize,
+  rightPinkyExtended,
+  handOpenMixRef,
+}: LensQuadProps) {
   const { camera, size, viewport } = useThree();
 
   // Map the orthographic camera 1:1 to screen-space pixels, top-left
@@ -58,6 +63,12 @@ export function LensQuad({ targetCorners, videoTexture, videoSize, sphereModeMix
         vertexShader,
         fragmentShader,
         transparent: true,
+        // Visibility here is entirely managed via uOpacity/mesh.visible,
+        // not the depth buffer — without this, the mesh still writes
+        // depth even while fully transparent, silently occluding other
+        // transparent content (sphere, particles) behind it at the same
+        // screen position.
+        depthWrite: false,
         // Corner winding depends on live, unpredictable hand positions (and
         // can bowtie if hands cross), so don't rely on a consistent
         // front-facing winding — render both sides.
@@ -82,6 +93,10 @@ export function LensQuad({ targetCorners, videoTexture, videoSize, sphereModeMix
           uAberrationDistortAmplitude: { value: config.aberrationDistortAmplitude },
           uPosterizeMix: { value: 0 },
           uPosterizeLevels: { value: config.posterizeLevels },
+          uSaturationMix: { value: 0 },
+          uSaturationBoost: { value: config.saturationBoost },
+          uSaturationHueShift: { value: config.saturationHueShift },
+          uFisheyeStrength: { value: config.fisheyeStrength },
         },
       }),
     [videoTexture, videoSize.width, videoSize.height],
@@ -115,6 +130,9 @@ export function LensQuad({ targetCorners, videoTexture, videoSize, sphereModeMix
   const ditherEnabledRef = useRef(false);
   const aberrationMixRef = useRef(0);
   const posterizeMixRef = useRef(0);
+  const isIndexTouchingRef = useRef(false);
+  const saturationEnabledRef = useRef(false);
+  const saturationMixRef = useRef(0);
 
   useFrame((state) => {
     material.uniforms.uTime.value = state.clock.elapsedTime;
@@ -131,8 +149,8 @@ export function LensQuad({ targetCorners, videoTexture, videoSize, sphereModeMix
 
     const targetOpacity = targetCorners ? 1 : 0;
     handsOpacityRef.current = lerp(handsOpacityRef.current, targetOpacity, FADE_FACTOR);
-    material.uniforms.uOpacity.value = handsOpacityRef.current * (1 - sphereModeMixRef.current);
-    if (meshRef.current) meshRef.current.visible = sphereModeMixRef.current < SPHERE_MODE_HIDE_THRESHOLD;
+    material.uniforms.uOpacity.value = rightPinkyExtended ? 0 : handsOpacityRef.current * (1 - handOpenMixRef.current);
+    if (meshRef.current) meshRef.current.visible = !rightPinkyExtended && handOpenMixRef.current < 0.98;
 
     const smoothed = smoothedCornersRef.current;
     if (!smoothed) return;
@@ -176,13 +194,13 @@ export function LensQuad({ targetCorners, videoTexture, videoSize, sphereModeMix
     material.uniforms.uDitherMix.value = ditherMixRef.current;
 
     // Chromatic aberration is a held pose (not a tap): active exactly
-    // while both thumbs sit above their own hand's index tip by at least
-    // the configured margin. Smoothly fades in/out with the pose rather
-    // than popping, same as the opacity show/hide fade.
+    // while the left thumb sits above the left index tip by at least the
+    // configured margin (right hand not considered). Smoothly fades
+    // in/out with the pose rather than popping, same as the opacity
+    // show/hide fade.
     const { aberrationPoseMargin } = config;
-    const rightThumbAboveIndex = ri.y - rt.y > aberrationPoseMargin;
     const leftThumbAboveIndex = li.y - lt.y > aberrationPoseMargin;
-    const targetAberrationMix = rightThumbAboveIndex && leftThumbAboveIndex ? 1 : 0;
+    const targetAberrationMix = leftThumbAboveIndex ? 1 : 0;
     aberrationMixRef.current = lerp(aberrationMixRef.current, targetAberrationMix, EFFECT_MIX_FACTOR);
     material.uniforms.uAberrationMix.value = aberrationMixRef.current;
     material.uniforms.uAberrationCenter.value.set(
@@ -201,6 +219,22 @@ export function LensQuad({ targetCorners, videoTexture, videoSize, sphereModeMix
     const targetPosterizeMix = handsCrossed ? 1 : 0;
     posterizeMixRef.current = lerp(posterizeMixRef.current, targetPosterizeMix, EFFECT_MIX_FACTOR);
     material.uniforms.uPosterizeMix.value = posterizeMixRef.current;
+
+    // LI/RI touch (both index fingertips touching) toggles a
+    // super-saturation + slight hue-shift fill, the same tap-to-switch
+    // way as the pixelate/dither pinches — independent of them.
+    const indexTouchDistance = Math.hypot(li.x - ri.x, li.y - ri.y);
+    const { saturationTouchOnDistance, saturationTouchOffDistance } = config;
+    if (!isIndexTouchingRef.current && indexTouchDistance < saturationTouchOnDistance) {
+      isIndexTouchingRef.current = true;
+      saturationEnabledRef.current = !saturationEnabledRef.current;
+    } else if (isIndexTouchingRef.current && indexTouchDistance > saturationTouchOffDistance) {
+      isIndexTouchingRef.current = false;
+    }
+
+    const targetSaturationMix = saturationEnabledRef.current ? 1 : 0;
+    saturationMixRef.current = lerp(saturationMixRef.current, targetSaturationMix, EFFECT_MIX_FACTOR);
+    material.uniforms.uSaturationMix.value = saturationMixRef.current;
 
     const position = geometry.attributes.position as THREE.BufferAttribute;
     const arr = position.array as Float32Array;

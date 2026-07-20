@@ -8,8 +8,19 @@ import { DebugOverlay } from './debug/DebugOverlay';
 import { LensQuad } from './scene/LensQuad';
 import { LensSphere } from './scene/LensSphere';
 import { SphereModeMix } from './scene/SphereModeMix';
-import { getCorners } from './tracking/corners';
-import { useRightPinkyExtended } from './tracking/gestures';
+import { HandOpenMix } from './scene/HandOpenMix';
+import { ParticleField } from './scene/ParticleField';
+import { getCorners, landmarkToScreen } from './tracking/corners';
+import {
+  getLeftHandKeyPoints,
+  getLeftHandPinkyAngle,
+  getLeftHandWrist,
+  getRightHandWrist,
+  useLeftHandOpen,
+  useLeftPinkyExtended,
+  useRightHandOpen,
+  useRightPinkyExtended,
+} from './tracking/gestures';
 import './App.css';
 
 function App() {
@@ -19,7 +30,23 @@ function App() {
   const stageSize = useWindowSize();
   const corners = getCorners(handResult, videoSize, stageSize);
   const rightPinkyExtended = useRightPinkyExtended(handResult);
+  const rightHandOpen = useRightHandOpen(handResult);
+  const leftPinkyExtended = useLeftPinkyExtended(handResult);
+  const leftHandOpen = useLeftHandOpen(handResult);
+  const leftHandAngle = getLeftHandPinkyAngle(handResult);
+  const leftHandWristLandmark = getLeftHandWrist(handResult);
+  const leftHandScreenPos =
+    leftHandWristLandmark && videoSize ? landmarkToScreen(leftHandWristLandmark, videoSize, stageSize) : null;
+  const leftHandKeyPointLandmarks = getLeftHandKeyPoints(handResult);
+  const leftHandRepelPoints =
+    leftHandKeyPointLandmarks && videoSize
+      ? leftHandKeyPointLandmarks.map((landmark) => landmarkToScreen(landmark, videoSize, stageSize))
+      : null;
+  const rightHandWristLandmark = getRightHandWrist(handResult);
+  const rightHandScreenPos =
+    rightHandWristLandmark && videoSize ? landmarkToScreen(rightHandWristLandmark, videoSize, stageSize) : null;
   const sphereModeMixRef = useRef(0);
+  const handOpenMixRef = useRef(0);
 
   const [videoTexture, setVideoTexture] = useState<THREE.VideoTexture | null>(null);
 
@@ -54,19 +81,46 @@ function App() {
             // LensQuad via useThree(), since r3f's built-in "manual
             // frustum via this prop" path only calls
             // updateProjectionMatrix() once and goes stale on resize.
-            camera={{ position: [0, 0, 10], near: 0.1, far: 1000 }}
+            // far is generous (well beyond 1000) because the sphere can
+            // now grow to the screen diagonal (open-hand full-screen
+            // gesture), and its geometry extends +/-radius in world Z —
+            // easily 2000+ on a large screen, which would otherwise get
+            // clipped by the far plane.
+            camera={{ position: [0, 0, 10], near: 0.1, far: 100000 }}
             gl={{ alpha: true }}
           >
             <SphereModeMix rightPinkyExtended={rightPinkyExtended} mixRef={sphereModeMixRef} />
+            <HandOpenMix leftHandOpen={leftHandOpen} mixRef={handOpenMixRef} />
             {hasTrackedOnce && (
               <LensQuad
                 targetCorners={corners}
                 videoTexture={videoTexture}
                 videoSize={videoSize}
-                sphereModeMixRef={sphereModeMixRef}
+                rightPinkyExtended={rightPinkyExtended}
+                handOpenMixRef={handOpenMixRef}
               />
             )}
-            <LensSphere targetCorners={corners} videoTexture={videoTexture} sphereModeMixRef={sphereModeMixRef} />
+            <LensSphere
+              targetCorners={corners}
+              videoTexture={videoTexture}
+              videoSize={videoSize}
+              rightHandOpen={rightHandOpen}
+              leftPinkyExtended={leftPinkyExtended}
+              leftHandOpen={leftHandOpen}
+              leftHandAngle={leftHandAngle}
+              sphereModeMixRef={sphereModeMixRef}
+              handOpenMixRef={handOpenMixRef}
+            />
+            <ParticleField
+              isSphereActive={rightPinkyExtended}
+              leftHandScreenPos={leftHandScreenPos}
+              leftHandRepelPoints={leftHandRepelPoints}
+              rightHandOpen={rightHandOpen}
+              rightHandScreenPos={rightHandScreenPos}
+              videoTexture={videoTexture}
+              videoSize={videoSize}
+              handOpenMixRef={handOpenMixRef}
+            />
           </Canvas>
         )}
         {isReady && (
@@ -76,6 +130,7 @@ function App() {
             corners={corners}
             videoSize={videoSize}
             rightPinkyExtended={rightPinkyExtended}
+            leftHandOpen={leftHandOpen}
           />
         )}
       </div>
