@@ -44,19 +44,24 @@ function lerp(a: number, b: number, t: number) {
 }
 
 /**
- * Pinky-extended detection for either hand, normalized by hand scale (not a
- * simple Y-position check) so it works at any distance from the camera and
- * at any hand rotation — "pinky up" can happen with the hand at many
- * angles, unlike the thumb-above-index gesture. Ratio = pinky tip-to-MCP
- * distance / wrist-to-middle-MCP distance (a stand-in for palm size):
- * large when the finger is extended straight out, small when curled back
- * toward the palm.
+ * Single-finger-extended detection for either hand, normalized by hand
+ * scale (not a simple Y-position check) so it works at any distance from
+ * the camera and at any hand rotation. Ratio = fingertip-to-MCP distance /
+ * wrist-to-middle-MCP distance (a stand-in for palm size): large when the
+ * finger is extended straight out, small when curled back toward the palm.
  *
  * Hysteresis (separate on/off thresholds), same pattern as the existing
  * pinch/pose gestures, so the boundary doesn't flicker. State is kept in a
  * ref across frames, reset whenever the given hand isn't tracked.
  */
-function usePinkyExtended(result: HandLandmarkerResult | null, label: 'Left' | 'Right'): boolean {
+function useFingerExtended(
+  result: HandLandmarkerResult | null,
+  label: 'Left' | 'Right',
+  tipIndex: number,
+  mcpIndex: number,
+  onRatio: number,
+  offRatio: number,
+): boolean {
   const extendedRef = useRef(false);
 
   const hand = result ? findHandByLabel(result, label) : null;
@@ -69,12 +74,11 @@ function usePinkyExtended(result: HandLandmarkerResult | null, label: 'Left' | '
   const handScale = getHandScale(hand);
   if (handScale < 1e-6) return extendedRef.current;
 
-  const ratio = getFingerExtensionRatio(hand, PINKY_TIP, PINKY_MCP, handScale);
+  const ratio = getFingerExtensionRatio(hand, tipIndex, mcpIndex, handScale);
 
-  const { pinkyExtendedOnRatio, pinkyExtendedOffRatio } = config;
-  if (!extendedRef.current && ratio > pinkyExtendedOnRatio) {
+  if (!extendedRef.current && ratio > onRatio) {
     extendedRef.current = true;
-  } else if (extendedRef.current && ratio < pinkyExtendedOffRatio) {
+  } else if (extendedRef.current && ratio < offRatio) {
     extendedRef.current = false;
   }
 
@@ -82,11 +86,33 @@ function usePinkyExtended(result: HandLandmarkerResult | null, label: 'Left' | '
 }
 
 export function useRightPinkyExtended(result: HandLandmarkerResult | null): boolean {
-  return usePinkyExtended(result, 'Right');
+  return useFingerExtended(result, 'Right', PINKY_TIP, PINKY_MCP, config.pinkyExtendedOnRatio, config.pinkyExtendedOffRatio);
 }
 
 export function useLeftPinkyExtended(result: HandLandmarkerResult | null): boolean {
-  return usePinkyExtended(result, 'Left');
+  return useFingerExtended(result, 'Left', PINKY_TIP, PINKY_MCP, config.pinkyExtendedOnRatio, config.pinkyExtendedOffRatio);
+}
+
+export function useRightIndexExtended(result: HandLandmarkerResult | null): boolean {
+  return useFingerExtended(
+    result,
+    'Right',
+    INDEX_TIP,
+    INDEX_MCP,
+    config.indexExtendedOnRatio,
+    config.indexExtendedOffRatio,
+  );
+}
+
+export function useRightMiddleExtended(result: HandLandmarkerResult | null): boolean {
+  return useFingerExtended(
+    result,
+    'Right',
+    MIDDLE_TIP,
+    MIDDLE_MCP,
+    config.middleExtendedOnRatio,
+    config.middleExtendedOffRatio,
+  );
 }
 
 /**
@@ -208,11 +234,12 @@ export function getLeftHandWrist(result: HandLandmarkerResult | null): Normalize
   return leftHand ? leftHand[WRIST] : null;
 }
 
-/** Raw wrist landmark of the right hand, or null if not tracked — for
- * converting to screen space via landmarkToScreen (see tracking/corners). */
-export function getRightHandWrist(result: HandLandmarkerResult | null): NormalizedLandmark | null {
+/** Raw index fingertip landmark of the right hand, or null if not tracked —
+ * for converting to screen space via landmarkToScreen (see
+ * tracking/corners). */
+export function getRightHandIndexTip(result: HandLandmarkerResult | null): NormalizedLandmark | null {
   const rightHand = result ? findHandByLabel(result, 'Right') : null;
-  return rightHand ? rightHand[WRIST] : null;
+  return rightHand ? rightHand[INDEX_TIP] : null;
 }
 
 /** Wrist + all 5 fingertip landmarks of the left hand, or null if not

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, type RefObject } from 'react';
+import { useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import * as THREE from 'three';
 import { useFrame, useThree } from '@react-three/fiber';
 import { vertexShader, fragmentShader } from './particleShader';
@@ -19,19 +19,65 @@ type ParticleFieldProps = {
   // tracked.
   leftHandRepelPoints: { x: number; y: number }[] | null;
   // Right hand open (all 5 fingers extended) pulls every circle toward
-  // rightHandScreenPos instead of their usual orbit.
+  // rightHandScreenPos (the right index fingertip) instead of their usual
+  // orbit.
   rightHandOpen: boolean;
   rightHandScreenPos: { x: number; y: number } | null;
+  // Right index finger raised (while square mode is active) explodes
+  // every square into config.squareExplodeCount smaller ones; lowering it
+  // reforms them back into the originals.
+  rightIndexExtended: boolean;
+  // Right middle finger raised (while square mode is active) sinks every
+  // square downward with a shared, smoothly engaging/releasing velocity.
+  rightMiddleExtended: boolean;
   videoTexture: THREE.VideoTexture;
   videoSize: Size;
   handOpenMixRef: RefObject<number>;
 };
 
 const PARTICLE_COUNT = config.particleCount;
-const PARTICLE_INDICES = Array.from({ length: PARTICLE_COUNT }, (_, i) => i);
+const CIRCLE_COUNT = config.circleCount;
+const CIRCLE_INDICES = Array.from({ length: CIRCLE_COUNT }, (_, i) => i);
 
 function lerp(a: number, b: number, t: number) {
   return a + (b - a) * t;
+}
+
+function smoothstep(t: number) {
+  return t * t * (3 - 2 * t);
+}
+
+type SquareParticle = {
+  x: number;
+  y: number;
+  phaseX: number;
+  phaseY: number;
+  vx: number; // decaying explosion-burst velocity
+  vy: number;
+  size: number;
+  // Reform target (the parent square's position/size at the moment it
+  // exploded) and the position this particle was at the instant reforming
+  // began — interpolated between the two over squareReformDuration.
+  parentX: number;
+  parentY: number;
+  reformStartX: number;
+  reformStartY: number;
+};
+
+function makeSquareParticle(x: number, y: number): SquareParticle {
+  return {
+    x,
+    y,
+    phaseX: Math.random() * Math.PI * 2,
+    phaseY: Math.random() * Math.PI * 2,
+    vx: 0,
+    vy: 0,
+    size: config.particleSize,
+    parentX: x,
+    parentY: y,
+    reformStartX: x,
+    reformStartY: y,
+  };
 }
 
 export function ParticleField({
@@ -40,6 +86,8 @@ export function ParticleField({
   leftHandRepelPoints,
   rightHandOpen,
   rightHandScreenPos,
+  rightIndexExtended,
+  rightMiddleExtended,
   videoTexture,
   videoSize,
   handOpenMixRef,
@@ -113,20 +161,35 @@ export function ParticleField({
   const squareMeshRefs = useRef<(THREE.Mesh | null)[]>([]);
   const circleMeshRefs = useRef<(THREE.Mesh | null)[]>([]);
 
+  // How many square meshes are currently rendered — grows on explosion
+  // (see below), resets back to PARTICLE_COUNT once the effect fades out.
+  const [squareCount, setSquareCount] = useState(PARTICLE_COUNT);
+  const squareIndices = useMemo(() => Array.from({ length: squareCount }, (_, i) => i), [squareCount]);
+
   // Per-particle wandering state for the squares (screen-space px),
   // persisted in a ref (not state) so useFrame can integrate it every
   // frame. Distinct random phases per particle so each wanders
-  // independently rather than in lockstep.
-  const squareParticlesRef = useRef(
-    Array.from({ length: PARTICLE_COUNT }, () => ({
-      x: Math.random() * window.innerWidth,
-      y: Math.random() * window.innerHeight,
-      phaseX: Math.random() * Math.PI * 2,
-      phaseY: Math.random() * Math.PI * 2,
-    })),
+  // independently rather than in lockstep. vx/vy is a separate, decaying
+  // burst velocity used right after an explosion; size lets exploded
+  // squares render smaller than the originals.
+  const squareParticlesRef = useRef<SquareParticle[]>(
+    Array.from({ length: PARTICLE_COUNT }, () =>
+      makeSquareParticle(Math.random() * window.innerWidth, Math.random() * window.innerHeight),
+    ),
   );
   const prevHandPosRef = useRef<{ x: number; y: number } | null>(null);
   const swarmVelocityRef = useRef({ x: 0, y: 0 });
+  // Shared downward velocity while the right middle finger is raised,
+  // smoothly ramping in/out (not an instant snap) via config.squareGravityMixFactor.
+  const gravityVelocityRef = useRef(0);
+
+  // Square explosion/reform state machine: 'normal' (originals) <->
+  // 'exploded' (bursting/wandering children, right index raised) ->
+  // 'reforming' (right index lowered, children easing back to their
+  // parent's position/size) -> back to 'normal'.
+  const wasIndexExtendedRef = useRef(false);
+  const explosionPhaseRef = useRef<'normal' | 'exploded' | 'reforming'>('normal');
+  const reformElapsedRef = useRef(0);
 
   // Per-particle orbit state for the circles: each keeps its own fixed
   // radius and angle offset from the screen center (randomized once), so
@@ -137,7 +200,7 @@ export function ParticleField({
   // a separate, decaying displacement from that orbital position, used
   // to repel the particle away from the hand when it's nearby.
   const circleParticlesRef = useRef(
-    Array.from({ length: PARTICLE_COUNT }, () => ({
+    Array.from({ length: CIRCLE_COUNT }, () => ({
       radius: Math.random() * Math.hypot(window.innerWidth, window.innerHeight) * 0.5,
       angleOffset: Math.random() * Math.PI * 2,
       offsetX: 0,
@@ -184,22 +247,113 @@ export function ParticleField({
     swarmVelocityRef.current.x *= config.squareSwarmDamping;
     swarmVelocityRef.current.y *= config.squareSwarmDamping;
 
-    if (!isSphereActive) {
+    // Right middle finger raised sinks every square downward — a shared
+    // velocity (not per-particle) that smoothly ramps toward
+    // squareGravitySpeed while held and back to 0 once released, rather
+    // than an instant on/off.
+    const targetGravity = rightMiddleExtended && !isSphereActive ? config.squareGravitySpeed : 0;
+    gravityVelocityRef.current = lerp(gravityVelocityRef.current, targetGravity, config.squareGravityMixFactor);
+
+    // Right index rising edge (square mode actually visible) explodes
+    // every current square into config.squareExplodeCount smaller ones,
+    // bursting outward from the original's position. Falling edge (while
+    // still exploded) starts reforming them back. Either transition is a
+    // no-op outside its expected starting phase.
+    const rightIndexRisingEdge = rightIndexExtended && !wasIndexExtendedRef.current;
+    const rightIndexFallingEdge = !rightIndexExtended && wasIndexExtendedRef.current;
+    wasIndexExtendedRef.current = rightIndexExtended;
+
+    if (rightIndexRisingEdge && !isSphereActive && mix > 0.01 && explosionPhaseRef.current === 'normal') {
+      const children: SquareParticle[] = [];
+      squareParticlesRef.current.forEach((parent) => {
+        for (let c = 0; c < config.squareExplodeCount; c++) {
+          const angle = Math.random() * Math.PI * 2;
+          const child = makeSquareParticle(parent.x, parent.y);
+          child.vx = Math.cos(angle) * config.squareExplodeBurstSpeed;
+          child.vy = Math.sin(angle) * config.squareExplodeBurstSpeed;
+          child.size = config.particleSize * config.squareExplodeSizeScale;
+          child.parentX = parent.x;
+          child.parentY = parent.y;
+          children.push(child);
+        }
+      });
+      squareParticlesRef.current = children;
+      explosionPhaseRef.current = 'exploded';
+      setSquareCount(children.length);
+    } else if (rightIndexFallingEdge && explosionPhaseRef.current === 'exploded') {
+      // Capture each child's current position as the reform start so the
+      // ease-back is smooth from wherever it currently is, not a snap.
+      squareParticlesRef.current.forEach((particle) => {
+        particle.reformStartX = particle.x;
+        particle.reformStartY = particle.y;
+      });
+      explosionPhaseRef.current = 'reforming';
+      reformElapsedRef.current = 0;
+    }
+
+    // Force-reset (regardless of phase) once the whole effect has fully
+    // faded out, so it's always ready to explode fresh next time.
+    if (explosionPhaseRef.current !== 'normal' && mix < 0.01) {
+      squareParticlesRef.current = Array.from({ length: PARTICLE_COUNT }, () =>
+        makeSquareParticle(Math.random() * size.width, Math.random() * size.height),
+      );
+      explosionPhaseRef.current = 'normal';
+      setSquareCount(PARTICLE_COUNT);
+    }
+
+    if (explosionPhaseRef.current === 'reforming') {
+      reformElapsedRef.current += delta;
+      const t = smoothstep(Math.min(reformElapsedRef.current / config.squareReformDuration, 1));
+
+      squareParticlesRef.current.forEach((particle, i) => {
+        particle.x = lerp(particle.reformStartX, particle.parentX, t);
+        particle.y = lerp(particle.reformStartY, particle.parentY, t);
+        particle.size = lerp(config.particleSize * config.squareExplodeSizeScale, config.particleSize, t);
+        const mesh = squareMeshRefs.current[i];
+        if (mesh) {
+          mesh.position.set(particle.x, particle.y, 0);
+          mesh.scale.setScalar(particle.size);
+        }
+      });
+
+      if (t >= 1) {
+        // Collapse: each contiguous group of squareExplodeCount children
+        // shares one parentX/parentY (set at explosion time) — rebuild
+        // the single original square per group from that.
+        const parents: SquareParticle[] = [];
+        for (let p = 0; p < PARTICLE_COUNT; p++) {
+          const child = squareParticlesRef.current[p * config.squareExplodeCount];
+          parents.push(makeSquareParticle(child.parentX, child.parentY));
+        }
+        squareParticlesRef.current = parents;
+        explosionPhaseRef.current = 'normal';
+        setSquareCount(PARTICLE_COUNT);
+      }
+    } else if (!isSphereActive) {
       const t = state.clock.elapsedTime;
       const w = size.width;
       const h = size.height;
       squareParticlesRef.current.forEach((particle, i) => {
+        particle.vx *= config.squareExplodeBurstDamping;
+        particle.vy *= config.squareExplodeBurstDamping;
+
         const wanderX = Math.sin(t * config.squareWanderSpeed + particle.phaseX) * config.squareWanderAmplitude;
         const wanderY = Math.cos(t * config.squareWanderSpeed + particle.phaseY) * config.squareWanderAmplitude;
-        particle.x += (wanderX + swarmVelocityRef.current.x) * delta;
-        particle.y += (wanderY + swarmVelocityRef.current.y) * delta;
+        particle.x += (wanderX + swarmVelocityRef.current.x + particle.vx) * delta;
+        particle.y += (wanderY + swarmVelocityRef.current.y + particle.vy + gravityVelocityRef.current) * delta;
 
-        // Wrap around screen edges so particles never permanently drift off.
+        // Wrap around screen edges so particles never permanently drift off
+        // — the same square continues straight through to the opposite
+        // edge, same as normal (no fresh respawn), so the total count
+        // never visibly changes while sinking.
         particle.x = ((particle.x % w) + w) % w;
         particle.y = ((particle.y % h) + h) % h;
 
         const mesh = squareMeshRefs.current[i];
-        if (mesh) mesh.position.set(particle.x, particle.y, 0);
+        if (mesh) {
+          mesh.position.set(particle.x, particle.y, 0);
+          mesh.scale.setScalar(particle.size);
+        }
       });
     }
 
@@ -216,8 +370,10 @@ export function ParticleField({
       const targetAttractMix = rightHandOpen && rightHandScreenPos ? 1 : 0;
       attractMixRef.current = lerp(attractMixRef.current, targetAttractMix, config.circleAttractMixFactor);
 
+      // Top-center of the screen, not the screen's own center — the whole
+      // orbit swirls around this point instead.
       const centerX = size.width / 2;
-      const centerY = size.height / 2;
+      const centerY = 0;
 
       circleParticlesRef.current.forEach((particle, i) => {
         const angle = ringAngleRef.current + particle.angleOffset;
@@ -266,7 +422,7 @@ export function ParticleField({
 
   return (
     <>
-      {PARTICLE_INDICES.map((i) => (
+      {squareIndices.map((i) => (
         <mesh
           key={`square-${i}`}
           ref={(el) => {
@@ -274,11 +430,10 @@ export function ParticleField({
           }}
           geometry={squareGeometry}
           material={squareMaterial}
-          scale={config.particleSize}
           frustumCulled={false}
         />
       ))}
-      {PARTICLE_INDICES.map((i) => (
+      {CIRCLE_INDICES.map((i) => (
         <mesh
           key={`circle-${i}`}
           ref={(el) => {

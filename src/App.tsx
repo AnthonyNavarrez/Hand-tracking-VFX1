@@ -15,10 +15,12 @@ import {
   getLeftHandKeyPoints,
   getLeftHandPinkyAngle,
   getLeftHandWrist,
-  getRightHandWrist,
+  getRightHandIndexTip,
   useLeftHandOpen,
   useLeftPinkyExtended,
   useRightHandOpen,
+  useRightIndexExtended,
+  useRightMiddleExtended,
   useRightPinkyExtended,
 } from './tracking/gestures';
 import './App.css';
@@ -31,6 +33,8 @@ function App() {
   const corners = getCorners(handResult, videoSize, stageSize);
   const rightPinkyExtended = useRightPinkyExtended(handResult);
   const rightHandOpen = useRightHandOpen(handResult);
+  const rightIndexExtended = useRightIndexExtended(handResult);
+  const rightMiddleExtended = useRightMiddleExtended(handResult);
   const leftPinkyExtended = useLeftPinkyExtended(handResult);
   const leftHandOpen = useLeftHandOpen(handResult);
   const leftHandAngle = getLeftHandPinkyAngle(handResult);
@@ -42,9 +46,11 @@ function App() {
     leftHandKeyPointLandmarks && videoSize
       ? leftHandKeyPointLandmarks.map((landmark) => landmarkToScreen(landmark, videoSize, stageSize))
       : null;
-  const rightHandWristLandmark = getRightHandWrist(handResult);
+  const rightHandIndexTipLandmark = getRightHandIndexTip(handResult);
   const rightHandScreenPos =
-    rightHandWristLandmark && videoSize ? landmarkToScreen(rightHandWristLandmark, videoSize, stageSize) : null;
+    rightHandIndexTipLandmark && videoSize
+      ? landmarkToScreen(rightHandIndexTipLandmark, videoSize, stageSize)
+      : null;
   const sphereModeMixRef = useRef(0);
   const handOpenMixRef = useRef(0);
 
@@ -117,6 +123,8 @@ function App() {
               leftHandRepelPoints={leftHandRepelPoints}
               rightHandOpen={rightHandOpen}
               rightHandScreenPos={rightHandScreenPos}
+              rightIndexExtended={rightIndexExtended}
+              rightMiddleExtended={rightMiddleExtended}
               videoTexture={videoTexture}
               videoSize={videoSize}
               handOpenMixRef={handOpenMixRef}

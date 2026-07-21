@@ -69,6 +69,13 @@ export const config = {
   // Hysteresis (on > off) so the boundary doesn't flicker.
   pinkyExtendedOnRatio: 0.75,
   pinkyExtendedOffRatio: 0.55,
+  // Right index finger raised — same technique/hysteresis pattern as the
+  // pinky gesture above, used to trigger the square-explosion effect.
+  indexExtendedOnRatio: 0.75,
+  indexExtendedOffRatio: 0.55,
+  // Right middle finger raised — same pattern, used to sink the squares.
+  middleExtendedOnRatio: 0.75,
+  middleExtendedOffRatio: 0.55,
 
   // Sphere radius (screen px) = average corner-to-centroid distance of the
   // 4 smoothed corners, scaled by this factor.
@@ -109,7 +116,8 @@ export const config = {
   // rotation-follow gesture (an open hand always also satisfies "pinky
   // up") — rotation-follow only applies when just the pinky is up.
   handOpenFadeFactor: 0.15, // per-frame lerp pace for the crossfade in/out
-  particleCount: 100,
+  particleCount: 100, // squares (quad-mode replacement)
+  circleCount: 400, // circles (sphere-mode replacement) — a denser field than squares
   particleSize: 55, // CSS px, both squares and circles
   // Squares (quad-mode replacement): each wanders independently via a
   // per-particle sine-based drift, plus a shared swarm velocity nudged by
@@ -119,6 +127,29 @@ export const config = {
   squareWanderAmplitude: 60, // CSS px/sec
   squareHandInfluence: 8, // swarm velocity gained per px of hand movement
   squareSwarmDamping: 0.9, // per-frame decay factor on the hand-driven swarm velocity
+  // Right index finger raised (while square mode is active) explodes
+  // every current square into this many smaller squares, bursting
+  // outward from the original's position before settling into the same
+  // wander/swarm behavior as before. Lowering the finger reforms them
+  // back into the originals (see squareReformDuration below); the effect
+  // fully fading out also force-resets it, so it's always ready to
+  // explode again next time.
+  squareExplodeCount: 10,
+  squareExplodeSizeScale: 0.35, // exploded square size, fraction of particleSize
+  squareExplodeBurstSpeed: 250, // CSS px/sec, initial outward speed
+  squareExplodeBurstDamping: 0.92, // per-frame decay factor on the burst velocity
+  // Lowering the index finger while exploded reverses it: each group of
+  // exploded squares eases back to its parent's position and size over
+  // this many seconds, then collapses back into the single original
+  // square, ready to explode again.
+  squareReformDuration: 0.6,
+  // Right middle finger raised (while square mode is active) sinks every
+  // square downward with a shared, smoothly engaging/releasing velocity.
+  // Squares wrap straight through to the top on exiting the bottom, same
+  // as their normal edge-wrapping — no new ones are spawned, so the total
+  // count never visibly changes.
+  squareGravitySpeed: 700, // CSS px/sec, downward speed once fully engaged
+  squareGravityMixFactor: 0.08, // per-frame lerp factor for engaging/releasing
   // Circles (sphere-mode replacement): each scattered at its own random,
   // fixed distance from the screen center, all swirling around the
   // center together via one shared rotation angle that always ticks
