@@ -12,9 +12,18 @@ type DebugOverlayProps = {
   result: HandLandmarkerResult | null;
   corners: Corners | null;
   videoSize: Size | null;
+  rightPinkyExtended: boolean;
+  leftHandOpen: boolean;
 };
 
-export function DebugOverlay({ videoRef, result, corners, videoSize }: DebugOverlayProps) {
+export function DebugOverlay({
+  videoRef,
+  result,
+  corners,
+  videoSize,
+  rightPinkyExtended,
+  leftHandOpen,
+}: DebugOverlayProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [visible, setVisible] = useState(true);
 
@@ -60,7 +69,11 @@ export function DebugOverlay({ videoRef, result, corners, videoSize }: DebugOver
       });
     }
 
-    if (corners) {
+    // Corner outline/dots/labels only make sense while the flat lens is
+    // the active mode — hide all of it while the sphere is up, or while
+    // the left-hand-open particle field has replaced the quad/sphere
+    // fill, so only whichever effect is actually active reads as active.
+    if (corners && !rightPinkyExtended && !leftHandOpen) {
       ctx.beginPath();
       corners.forEach((corner, i) => {
         if (i === 0) ctx.moveTo(corner.x, corner.y);
@@ -86,7 +99,12 @@ export function DebugOverlay({ videoRef, result, corners, videoSize }: DebugOver
         ctx.fillText(CORNER_LABELS[i], corner.x, corner.y - 14);
       });
     }
-  }, [result, corners, visible, videoRef, videoSize]);
+
+    ctx.font = 'bold 16px system-ui, sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillStyle = rightPinkyExtended ? '#3bff6a' : 'rgba(255, 255, 255, 0.5)';
+    ctx.fillText(`PINKY: ${rightPinkyExtended ? 'UP' : 'down'}`, 12, 24);
+  }, [result, corners, visible, videoRef, videoSize, rightPinkyExtended, leftHandOpen]);
 
   return <canvas ref={canvasRef} className="debug-overlay" />;
 }
