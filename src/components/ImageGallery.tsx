@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { motion } from 'motion/react';
 import { useCamera } from '../context/CameraContext';
 import { useTracking } from '../context/TrackingContext';
 import { useWindowSize } from '../hooks/useWindowSize';
@@ -124,47 +125,65 @@ export function ImageGallery() {
     }
   }, [pinchDistance]);
 
-  return (
-    <div className="image-gallery-row">
-      {IMAGE_FILES.map((file) => (
-        <div
-          key={file}
-          className="image-gallery-card-slot"
-          ref={(node) => {
-            if (node) cardNodesRef.current.set(file, node);
-            else cardNodesRef.current.delete(file);
-          }}
-        >
-          <TiltedCard
-            imageSrc={`/${file}`}
-            altText={captionFor(file)}
-            showTooltip={false}
-            containerWidth="100%"
-            containerHeight="100%"
-            imageWidth="100%"
-            imageHeight="100%"
-            rotateAmplitude={10}
-            scaleOnHover={1.4}
-            // Y is clamped into the hovered card's own rect so the tilt
-            // math (offsetY / rect.height) stays within its intended
-            // range even when the raw fingertip sits well above/below
-            // the card itself.
-            pointerScreenPos={
-              hoveredFile === file && hoveredRect && pointerScreenPos
-                ? { x: pointerScreenPos.x, y: Math.min(Math.max(pointerScreenPos.y, hoveredRect.top), hoveredRect.bottom) }
-                : null
-            }
-          />
-        </div>
-      ))}
+  // Shared layoutId per card (its filename) is what lets Framer Motion
+  // FLIP-animate a card between the row and selected layouts below, even
+  // though it moves to a different DOM parent (and gets a fresh TiltedCard
+  // instance, resetting its own hover springs) when selection changes.
+  function renderCard(file: string) {
+    return (
+      <motion.div
+        key={file}
+        layoutId={file}
+        layout
+        className="image-gallery-card-slot"
+        ref={(node) => {
+          if (node) cardNodesRef.current.set(file, node);
+          else cardNodesRef.current.delete(file);
+        }}
+      >
+        <TiltedCard
+          imageSrc={`/${file}`}
+          altText={captionFor(file)}
+          showTooltip={false}
+          containerWidth="100%"
+          containerHeight="100%"
+          imageWidth="100%"
+          imageHeight="100%"
+          rotateAmplitude={10}
+          scaleOnHover={1.4}
+          // Y is clamped into the hovered card's own rect so the tilt
+          // math (offsetY / rect.height) stays within its intended range
+          // even when the raw fingertip sits well above/below the card
+          // itself.
+          pointerScreenPos={
+            hoveredFile === file && hoveredRect && pointerScreenPos
+              ? { x: pointerScreenPos.x, y: Math.min(Math.max(pointerScreenPos.y, hoveredRect.top), hoveredRect.bottom) }
+              : null
+          }
+        />
+      </motion.div>
+    );
+  }
 
-      {/* Brings forward Phase T6's optional debug readout — the
-          selected/bottom-row layout (Phase T5) doesn't exist yet to show
-          selection visually, so this is the only way to confirm the
-          pinch state machine before then. */}
+  return (
+    <>
+      {selectedFile === null ? (
+        <div className="image-gallery-row">{IMAGE_FILES.map(renderCard)}</div>
+      ) : (
+        <div className="image-gallery-selected-layout">
+          <div className="image-gallery-selected-slot">{renderCard(selectedFile)}</div>
+          <div className="image-gallery-bottom-row">
+            {IMAGE_FILES.filter((file) => file !== selectedFile).map(renderCard)}
+          </div>
+        </div>
+      )}
+
+      {/* Started as Phase T6's optional debug readout, brought forward in
+          T4 to confirm the pinch state machine before this layout existed
+          — kept on since it's still handy for tuning hover/select. */}
       <div className="image-gallery-debug">
         Hover: {hoveredFile ?? '—'} · Selected: {selectedFile ?? '—'}
       </div>
-    </div>
+    </>
   );
 }
