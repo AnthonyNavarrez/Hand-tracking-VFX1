@@ -256,6 +256,14 @@ export function getRightHandIndexTip(result: HandLandmarkerResult | null): Norma
   return rightHand ? rightHand[INDEX_TIP] : null;
 }
 
+/** Raw thumb tip landmark of the right hand, or null if not tracked — for
+ * converting to screen space via landmarkToScreen (see tracking/corners),
+ * e.g. to measure the right index/thumb pinch distance. */
+export function getRightHandThumbTip(result: HandLandmarkerResult | null): NormalizedLandmark | null {
+  const rightHand = result ? findHandByLabel(result, 'Right') : null;
+  return rightHand ? rightHand[THUMB_TIP] : null;
+}
+
 /** Wrist + all 5 fingertip landmarks of the left hand, or null if not
  * tracked — for effects (like the particle-repel field) that should react
  * to the whole spread of an open hand, not just a single wrist point. */

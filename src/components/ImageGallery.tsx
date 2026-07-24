@@ -1,9 +1,10 @@
-import { useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useCamera } from '../context/CameraContext';
 import { useTracking } from '../context/TrackingContext';
 import { useWindowSize } from '../hooks/useWindowSize';
-import { getRightHandIndexTip, useRightIndexExtended } from '../tracking/gestures';
+import { getRightHandIndexTip, getRightHandThumbTip, useRightIndexExtended } from '../tracking/gestures';
 import { landmarkToScreen } from '../tracking/corners';
+import { config } from '../config';
 import { TiltedCard } from './TiltedCard';
 import './ImageGallery.css';
 
@@ -33,14 +34,25 @@ export function ImageGallery() {
   const stageSize = useWindowSize();
   const rightIndexExtended = useRightIndexExtended(handResult);
 
+  const rightIndexTipLandmark = getRightHandIndexTip(handResult);
+  const rightIndexTipScreenPos =
+    rightIndexTipLandmark && videoSize ? landmarkToScreen(rightIndexTipLandmark, videoSize, stageSize) : null;
+
   // Same technique as HandVfxTool's rightHandScreenPos, but only "armed"
   // while the right index finger is raised — the aim gesture. Lowering
   // it clears the pointer entirely, which cascades into no card being
   // hovered below.
-  const rightIndexTipLandmark = getRightHandIndexTip(handResult);
-  const pointerScreenPos =
-    rightIndexExtended && rightIndexTipLandmark && videoSize
-      ? landmarkToScreen(rightIndexTipLandmark, videoSize, stageSize)
+  const pointerScreenPos = rightIndexExtended ? rightIndexTipScreenPos : null;
+
+  const rightThumbTipLandmark = getRightHandThumbTip(handResult);
+  const rightThumbScreenPos =
+    rightThumbTipLandmark && videoSize ? landmarkToScreen(rightThumbTipLandmark, videoSize, stageSize) : null;
+  // Raw index/thumb distance, independent of rightIndexExtended — a pinch
+  // (tips touching) is a distinct pose from "finger held out straight",
+  // so it shouldn't be starved by the aim gesture's own threshold.
+  const pinchDistance =
+    rightIndexTipScreenPos && rightThumbScreenPos
+      ? Math.hypot(rightIndexTipScreenPos.x - rightThumbScreenPos.x, rightIndexTipScreenPos.y - rightThumbScreenPos.y)
       : null;
 
   const cardNodesRef = useRef(new Map<string, HTMLDivElement>());
@@ -72,6 +84,45 @@ export function ImageGallery() {
       }
     }
   }
+
+  // The pinch-tap handler (below) needs to know "what was hovered at the
+  // moment the tap fired", but hoveredFile itself is a plain render-time
+  // value, not state — this ref just carries the latest one forward so
+  // the effect can read it without adding it as a dependency (which,
+  // being a plain string/null, would be safe to depend on anyway, but
+  // the ref keeps the pinch effect solely triggered by pinchDistance).
+  const hoveredFileRef = useRef<string | null>(null);
+  hoveredFileRef.current = hoveredFile;
+
+  const [selectedFile, setSelectedFile] = useState<string | null>(null);
+  const isPinchTouchingRef = useRef(false);
+
+  // RI/RT pinch tap-toggle (same hysteresis pattern as LensQuad's own
+  // pinches): select/deselect/swap per Core architecture §2, evaluated
+  // against whatever was hovered at the moment the tap crosses the "on"
+  // threshold. A plain number dependency (not an object recomputed every
+  // render) so this only re-runs when the tracked distance actually
+  // changes, not on every render.
+  useEffect(() => {
+    if (pinchDistance === null) {
+      isPinchTouchingRef.current = false;
+      return;
+    }
+    const { gallerySelectPinchOnDistance, gallerySelectPinchOffDistance } = config;
+    if (!isPinchTouchingRef.current && pinchDistance < gallerySelectPinchOnDistance) {
+      isPinchTouchingRef.current = true;
+      const hovered = hoveredFileRef.current;
+      if (hovered !== null) {
+        setSelectedFile((prev) => {
+          if (prev === null) return hovered; // select
+          if (hovered === prev) return null; // deselect
+          return hovered; // swap
+        });
+      }
+    } else if (isPinchTouchingRef.current && pinchDistance > gallerySelectPinchOffDistance) {
+      isPinchTouchingRef.current = false;
+    }
+  }, [pinchDistance]);
 
   return (
     <div className="image-gallery-row">
@@ -106,6 +157,14 @@ export function ImageGallery() {
           />
         </div>
       ))}
+
+      {/* Brings forward Phase T6's optional debug readout — the
+          selected/bottom-row layout (Phase T5) doesn't exist yet to show
+          selection visually, so this is the only way to confirm the
+          pinch state machine before then. */}
+      <div className="image-gallery-debug">
+        Hover: {hoveredFile ?? '—'} · Selected: {selectedFile ?? '—'}
+      </div>
     </div>
   );
 }
