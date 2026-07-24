@@ -115,6 +115,20 @@ export function useRightMiddleExtended(result: HandLandmarkerResult | null): boo
   );
 }
 
+/** Left index finger raised — Tool 2's gallery visibility gate. Same
+ * ratio/threshold pair as the right index gesture (shared across hands,
+ * same anatomy), just pointed at the left hand. */
+export function useLeftIndexExtended(result: HandLandmarkerResult | null): boolean {
+  return useFingerExtended(
+    result,
+    'Left',
+    INDEX_TIP,
+    INDEX_MCP,
+    config.indexExtendedOnRatio,
+    config.indexExtendedOffRatio,
+  );
+}
+
 /**
  * "Open palm" (all 5 fingers extended) detection for either hand — same
  * tip-to-MCP/hand-scale ratio technique as the pinky gesture, applied to
