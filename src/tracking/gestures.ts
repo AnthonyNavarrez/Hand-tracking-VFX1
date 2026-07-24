@@ -129,6 +129,27 @@ export function useLeftIndexExtended(result: HandLandmarkerResult | null): boole
   );
 }
 
+/** Left middle finger raised — Tool 2's dome-gallery visibility gate.
+ * Same ratio/threshold pair as the right middle gesture, pointed at the
+ * left hand. */
+export function useLeftMiddleExtended(result: HandLandmarkerResult | null): boolean {
+  return useFingerExtended(
+    result,
+    'Left',
+    MIDDLE_TIP,
+    MIDDLE_MCP,
+    config.middleExtendedOnRatio,
+    config.middleExtendedOffRatio,
+  );
+}
+
+/** Right ring finger raised — Tool 2 dome gallery's rotation-follow
+ * gesture. Same tip-to-MCP/hand-scale ratio technique as every other
+ * single-finger gesture here. */
+export function useRightRingExtended(result: HandLandmarkerResult | null): boolean {
+  return useFingerExtended(result, 'Right', RING_TIP, RING_MCP, config.ringExtendedOnRatio, config.ringExtendedOffRatio);
+}
+
 /**
  * "Open palm" (all 5 fingers extended) detection for either hand — same
  * tip-to-MCP/hand-scale ratio technique as the pinky gesture, applied to
@@ -262,6 +283,14 @@ export function getRightHandIndexTip(result: HandLandmarkerResult | null): Norma
 export function getRightHandThumbTip(result: HandLandmarkerResult | null): NormalizedLandmark | null {
   const rightHand = result ? findHandByLabel(result, 'Right') : null;
   return rightHand ? rightHand[THUMB_TIP] : null;
+}
+
+/** Raw ring fingertip landmark of the right hand, or null if not tracked
+ * — for converting to screen space via landmarkToScreen (see
+ * tracking/corners), e.g. to drive Tool 2's dome-gallery rotation-follow. */
+export function getRightHandRingTip(result: HandLandmarkerResult | null): NormalizedLandmark | null {
+  const rightHand = result ? findHandByLabel(result, 'Right') : null;
+  return rightHand ? rightHand[RING_TIP] : null;
 }
 
 /** Wrist + all 5 fingertip landmarks of the left hand, or null if not

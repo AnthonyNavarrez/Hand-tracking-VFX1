@@ -171,4 +171,25 @@ export const config = {
   // needs to diverge once real cards (not lens corners) are involved.
   gallerySelectPinchOnDistance: 45,
   gallerySelectPinchOffDistance: 85,
+
+  // Right ring finger raised (Tool 2 dome gallery's rotation-follow
+  // gesture, and the right-hand gate generally) — same technique/values
+  // as the other single-finger gestures.
+  ringExtendedOnRatio: 0.75,
+  ringExtendedOffRatio: 0.55,
+
+  // Tool 2 dome mode: left middle finger raised swaps the flat gallery
+  // for a rotating photo dome (ported from React Bits' DomeGallery).
+  // Right middle finger raised auto-spins it at this rate; right ring
+  // finger raised instead lets its screen-space movement drive rotation
+  // directly, using the same delta-since-gesture-started math the
+  // ported component originally used for a real pointer drag (its own
+  // "dragSensitivity" default was 20 — kept here under a Tool-2-specific
+  // name since there's no real drag anymore).
+  domeSpinSpeedDegPerSec: 25,
+  domeRingFollowSensitivity: 20,
+  // Scale applied to whichever dome tile the right index fingertip is
+  // physically over (real 2D containment, unlike the flat gallery's
+  // X-only hover rule).
+  domeHoverScale: 1.15,
 };

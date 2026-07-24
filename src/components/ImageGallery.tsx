@@ -6,28 +6,9 @@ import { useWindowSize } from '../hooks/useWindowSize';
 import { getRightHandIndexTip, getRightHandThumbTip, useRightIndexExtended } from '../tracking/gestures';
 import { landmarkToScreen } from '../tracking/corners';
 import { config } from '../config';
+import { GALLERY_IMAGE_FILES, galleryImageCaption } from '../data/galleryImages';
 import { TiltedCard } from './TiltedCard';
 import './ImageGallery.css';
-
-// Row order follows the numeric filename suffix (nature1 → nature10),
-// left to right, regardless of file extension.
-const IMAGE_FILES = [
-  'nature1.jpg',
-  'nature2.jpg',
-  'nature3.webp',
-  'nature4.jpg',
-  'nature5.avif',
-  'nature6.jpeg',
-  'nature7.webp',
-  'nature8.webp',
-  'nature9.webp',
-  'nature10.webp',
-];
-
-function captionFor(file: string): string {
-  const base = file.replace(/\.[^.]+$/, '').replace(/(\d+)$/, ' $1');
-  return base.charAt(0).toUpperCase() + base.slice(1);
-}
 
 export function ImageGallery() {
   const { videoSize } = useCamera();
@@ -143,7 +124,7 @@ export function ImageGallery() {
       >
         <TiltedCard
           imageSrc={`/${file}`}
-          altText={captionFor(file)}
+          altText={galleryImageCaption(file)}
           showTooltip={false}
           containerWidth="100%"
           containerHeight="100%"
@@ -168,12 +149,12 @@ export function ImageGallery() {
   return (
     <>
       {selectedFile === null ? (
-        <div className="image-gallery-row">{IMAGE_FILES.map(renderCard)}</div>
+        <div className="image-gallery-row">{GALLERY_IMAGE_FILES.map(renderCard)}</div>
       ) : (
         <div className="image-gallery-selected-layout">
           <div className="image-gallery-selected-slot">{renderCard(selectedFile)}</div>
           <div className="image-gallery-bottom-row">
-            {IMAGE_FILES.filter((file) => file !== selectedFile).map(renderCard)}
+            {GALLERY_IMAGE_FILES.filter((file) => file !== selectedFile).map(renderCard)}
           </div>
         </div>
       )}
