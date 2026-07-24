@@ -1,0 +1,122 @@
+.help-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.6);
+  padding: 24px;
+}
+
+.help-modal {
+  position: relative;
+  width: 100%;
+  max-width: 560px;
+  max-height: min(680px, 100%);
+  display: flex;
+  flex-direction: column;
+  background: #16141d;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 20px;
+  color: #fff;
+  font-family: system-ui, sans-serif;
+  overflow: hidden;
+}
+
+.help-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px 0;
+}
+
+.help-title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.help-close {
+  appearance: none;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+}
+
+.help-close:hover {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.help-tabs {
+  display: flex;
+  gap: 8px;
+  padding: 16px 24px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.help-tab {
+  appearance: none;
+  border: none;
+  background: none;
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 14px;
+  font-weight: 500;
+  padding: 8px 4px 12px;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+}
+
+.help-tab.active {
+  color: #fff;
+  border-bottom-color: #fff;
+}
+
+.help-body {
+  padding: 20px 24px 24px;
+  overflow-y: auto;
+}
+
+.help-section-title {
+  margin: 0 0 4px;
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.help-list {
+  list-style: none;
+  margin: 12px 0 20px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.help-list:last-child {
+  margin-bottom: 0;
+}
+
+.help-list li {
+  font-size: 14px;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.help-list strong {
+  color: #fff;
+  font-weight: 600;
+}
+
+.help-placeholder {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.6);
+}

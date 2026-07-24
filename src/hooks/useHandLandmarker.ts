@@ -59,5 +59,5 @@ export function useHandLandmarker(videoRef: RefObject<HTMLVideoElement | null>, 
     return () => cancelAnimationFrame(rafRef.current);
   }, [isVideoReady, isModelReady, videoRef]);
 
-  return result;
+  return { result, isModelReady };
 }
