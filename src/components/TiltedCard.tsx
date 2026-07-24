@@ -1,12 +1,22 @@
 import { useEffect, useRef } from 'react';
 import type { ReactNode } from 'react';
-import { motion, useMotionValue, useSpring } from 'motion/react';
+import { motion, useMotionValue, useSpring, useTransform } from 'motion/react';
 import './TiltedCard.css';
 
 const springValues = {
   damping: 30,
   stiffness: 100,
   mass: 2,
+};
+
+// Snappier than springValues (lower mass, higher stiffness) — used only
+// for the hover/dehover pop (scale + opacity), which should feel quick,
+// while the tilt-follow rotation keeps the slower springValues above for
+// a smoother, less twitchy pointer-tracking feel.
+const enterLeaveSpringValues = {
+  damping: 30,
+  stiffness: 400,
+  mass: 0.5,
 };
 
 type ScreenPos = { x: number; y: number } | null;
@@ -54,34 +64,35 @@ export function TiltedCard({
   const y = useMotionValue(0);
   const rotateX = useSpring(useMotionValue(0), springValues);
   const rotateY = useSpring(useMotionValue(0), springValues);
-  const scale = useSpring(1, springValues);
-  const opacity = useSpring(0);
+  const scale = useSpring(1, enterLeaveSpringValues);
+  const opacity = useSpring(0, enterLeaveSpringValues);
   const rotateFigcaption = useSpring(0, {
     stiffness: 350,
     damping: 30,
     mass: 1,
   });
+  // Cards sit edge-to-edge in the row; a large scaleOnHover would
+  // otherwise get visually clipped under its still-flat neighbors, so
+  // lift the hovered card above them for as long as it's scaled up.
+  const zIndex = useTransform(scale, (value) => (value > 1.001 ? 1 : 0));
 
   const lastOffsetYRef = useRef(0);
   const isEnteredRef = useRef(false);
 
   // Runs whenever a new pointer position arrives (i.e. on every tracking
   // update), taking the place of the original's per-DOM-event handlers.
-  // "Entered"/"left" is now decided here, from rect containment, instead
-  // of the browser's own mouseenter/mouseleave.
+  // "Entered"/"left" is now just whether the caller gave us a position at
+  // all — ImageGallery already decides *which* card is hovered (per its
+  // own X-based rule) and only ever passes a non-null position to that
+  // one, so re-deriving containment from this card's own rect here would
+  // be redundant and, worse, could disagree with the caller right at the
+  // rect's edge.
   useEffect(() => {
     const node = ref.current;
     if (!node) return;
 
-    const rect = node.getBoundingClientRect();
-    const inside =
-      !!pointerScreenPos &&
-      pointerScreenPos.x >= rect.left &&
-      pointerScreenPos.x <= rect.right &&
-      pointerScreenPos.y >= rect.top &&
-      pointerScreenPos.y <= rect.bottom;
-
-    if (inside && pointerScreenPos) {
+    if (pointerScreenPos) {
+      const rect = node.getBoundingClientRect();
       if (!isEnteredRef.current) {
         isEnteredRef.current = true;
         scale.set(scaleOnHover);
@@ -114,7 +125,11 @@ export function TiltedCard({
   }, [pointerScreenPos, rotateAmplitude, scaleOnHover, opacity, scale, rotateX, rotateY, rotateFigcaption, x, y]);
 
   return (
-    <figure ref={ref} className="tilted-card-figure" style={{ height: containerHeight, width: containerWidth }}>
+    <motion.figure
+      ref={ref}
+      className="tilted-card-figure"
+      style={{ height: containerHeight, width: containerWidth, zIndex }}
+    >
       <motion.div
         className="tilted-card-inner"
         style={{ width: imageWidth, height: imageHeight, rotateX, rotateY, scale }}
@@ -136,6 +151,6 @@ export function TiltedCard({
           {captionText}
         </motion.figcaption>
       )}
-    </figure>
+    </motion.figure>
   );
 }
