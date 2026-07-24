@@ -163,4 +163,12 @@ export const config = {
   // it instead of their usual orbit+repel position. Per-frame lerp factor
   // (0-1) for how quickly that pull engages/releases.
   circleAttractMixFactor: 0.08,
+
+  // Tool 2 gallery: right index/thumb pinch (screen px, on the raw
+  // fingertip positions) tap-toggles select/deselect/swap on whichever
+  // card is hovered — same tap-to-toggle/hysteresis pattern as the
+  // lens's pixelate/dither pinches, scoped separately in case tuning
+  // needs to diverge once real cards (not lens corners) are involved.
+  gallerySelectPinchOnDistance: 45,
+  gallerySelectPinchOffDistance: 85,
 };

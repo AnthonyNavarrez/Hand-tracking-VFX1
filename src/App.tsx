@@ -3,7 +3,7 @@ import { CameraProvider } from './context/CameraContext';
 import Dashboard from './routes/Dashboard';
 import ToolLayout from './routes/ToolLayout';
 import HandVfxTool from './routes/HandVfxTool';
-import ToolTwoStub from './routes/ToolTwoStub';
+import ToolTwo from './routes/ToolTwo';
 
 function App() {
   return (
@@ -13,7 +13,7 @@ function App() {
           <Route path="/" element={<Dashboard />} />
           <Route element={<ToolLayout />}>
             <Route path="/hand-vfx" element={<HandVfxTool />} />
-            <Route path="/tool-2" element={<ToolTwoStub />} />
+            <Route path="/tool-2" element={<ToolTwo />} />
           </Route>
         </Routes>
       </BrowserRouter>

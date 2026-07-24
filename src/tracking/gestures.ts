@@ -115,6 +115,20 @@ export function useRightMiddleExtended(result: HandLandmarkerResult | null): boo
   );
 }
 
+/** Left index finger raised — Tool 2's gallery visibility gate. Same
+ * ratio/threshold pair as the right index gesture (shared across hands,
+ * same anatomy), just pointed at the left hand. */
+export function useLeftIndexExtended(result: HandLandmarkerResult | null): boolean {
+  return useFingerExtended(
+    result,
+    'Left',
+    INDEX_TIP,
+    INDEX_MCP,
+    config.indexExtendedOnRatio,
+    config.indexExtendedOffRatio,
+  );
+}
+
 /**
  * "Open palm" (all 5 fingers extended) detection for either hand — same
  * tip-to-MCP/hand-scale ratio technique as the pinky gesture, applied to
@@ -240,6 +254,14 @@ export function getLeftHandWrist(result: HandLandmarkerResult | null): Normalize
 export function getRightHandIndexTip(result: HandLandmarkerResult | null): NormalizedLandmark | null {
   const rightHand = result ? findHandByLabel(result, 'Right') : null;
   return rightHand ? rightHand[INDEX_TIP] : null;
+}
+
+/** Raw thumb tip landmark of the right hand, or null if not tracked — for
+ * converting to screen space via landmarkToScreen (see tracking/corners),
+ * e.g. to measure the right index/thumb pinch distance. */
+export function getRightHandThumbTip(result: HandLandmarkerResult | null): NormalizedLandmark | null {
+  const rightHand = result ? findHandByLabel(result, 'Right') : null;
+  return rightHand ? rightHand[THUMB_TIP] : null;
 }
 
 /** Wrist + all 5 fingertip landmarks of the left hand, or null if not

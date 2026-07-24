@@ -1,0 +1,68 @@
+.image-gallery-row {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1vw;
+  padding: 0 2vw;
+  box-sizing: border-box;
+}
+
+.image-gallery-card-slot {
+  flex: 1 1 0;
+  min-width: 0;
+  aspect-ratio: 2 / 3;
+  max-height: 70vh;
+}
+
+/* Selected layout: the chosen card in a large centered slot on top, the
+   other 9 in a smaller row pinned to the bottom. */
+.image-gallery-selected-layout {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  padding: 24px 2vw 18vh;
+}
+
+.image-gallery-selected-slot {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+}
+
+.image-gallery-selected-slot .image-gallery-card-slot {
+  flex: none;
+  height: 100%;
+  max-height: 65vh;
+}
+
+.image-gallery-bottom-row {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 0.6vw;
+  margin-top: 16px;
+}
+
+.image-gallery-bottom-row .image-gallery-card-slot {
+  max-width: 90px;
+  max-height: 16vh;
+}
+
+.image-gallery-debug {
+  position: absolute;
+  left: 12px;
+  bottom: 12px;
+  padding: 4px 10px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.5);
+  color: #fff;
+  font: 13px system-ui, sans-serif;
+  pointer-events: none;
+}
