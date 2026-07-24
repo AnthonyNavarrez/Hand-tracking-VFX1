@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { Canvas } from '@react-three/fiber';
-import { useWebcam } from '../hooks/useWebcam';
+import { useCamera } from '../context/CameraContext';
 import { useHandLandmarker } from '../hooks/useHandLandmarker';
 import { useWindowSize } from '../hooks/useWindowSize';
 import { DebugOverlay } from '../debug/DebugOverlay';
@@ -26,7 +26,7 @@ import {
 import '../App.css';
 
 function HandVfxTool() {
-  const { videoRef, isReady, error, videoSize } = useWebcam();
+  const { videoRef, isReady, error, videoSize } = useCamera();
   const handResult = useHandLandmarker(videoRef, isReady);
 
   const stageSize = useWindowSize();
@@ -78,7 +78,6 @@ function HandVfxTool() {
   return (
     <div className="app">
       <div className="stage">
-        <video ref={videoRef} className="webcam-video" autoPlay muted playsInline />
         {videoTexture && videoSize && (
           <Canvas
             style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none' }}

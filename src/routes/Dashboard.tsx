@@ -5,7 +5,16 @@ import { Link } from 'react-router-dom';
 // comes in later phases (D2, D4, D5).
 function Dashboard() {
   return (
-    <div style={{ padding: 24, fontFamily: 'system-ui, sans-serif', color: '#fff', background: '#000', minHeight: '100vh' }}>
+    <div
+      style={{
+        position: 'relative',
+        padding: 24,
+        fontFamily: 'system-ui, sans-serif',
+        color: '#fff',
+        background: '#000',
+        minHeight: '100vh',
+      }}
+    >
       <h1>Dashboard (placeholder)</h1>
       <nav style={{ display: 'flex', gap: 16 }}>
         <Link to="/hand-vfx">Hand VFX Lens</Link>
