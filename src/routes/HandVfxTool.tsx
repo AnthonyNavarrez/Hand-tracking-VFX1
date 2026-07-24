@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { Canvas } from '@react-three/fiber';
 import { useCamera } from '../context/CameraContext';
-import { useHandLandmarker } from '../hooks/useHandLandmarker';
+import { useTracking } from '../context/TrackingContext';
 import { useWindowSize } from '../hooks/useWindowSize';
 import { DebugOverlay } from '../debug/DebugOverlay';
 import { LensQuad } from '../scene/LensQuad';
@@ -27,7 +27,7 @@ import '../App.css';
 
 function HandVfxTool() {
   const { videoRef, isReady, error, videoSize } = useCamera();
-  const handResult = useHandLandmarker(videoRef, isReady);
+  const { result: handResult, isModelReady } = useTracking();
 
   const stageSize = useWindowSize();
   const corners = getCorners(handResult, videoSize, stageSize);
@@ -143,6 +143,7 @@ function HandVfxTool() {
       </div>
       {error && <div className="status status-error">Camera error: {error}</div>}
       {!isReady && !error && <div className="status">Requesting camera access…</div>}
+      {isReady && !isModelReady && <div className="status">Loading hand tracking model…</div>}
     </div>
   );
 }
