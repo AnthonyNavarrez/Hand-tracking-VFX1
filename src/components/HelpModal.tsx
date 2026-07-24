@@ -116,5 +116,33 @@ function HandVfxHelp() {
 }
 
 function ToolTwoHelp() {
-  return <p className="help-placeholder">Tool 2 doesn't exist yet — its gestures will be documented here once it's built.</p>;
+  return (
+    <>
+      <p className="help-section-title">Gallery visibility</p>
+      <ul className="help-list">
+        <li>
+          <strong>Left index finger up</strong> reveals the row of images. Lowering it hides everything and
+          resets any selection, so it always reopens fresh.
+        </li>
+      </ul>
+
+      <p className="help-section-title">Browsing</p>
+      <ul className="help-list">
+        <li>
+          <strong>Right index finger up</strong> aims a hover cursor across the row — whichever image lines up
+          with your fingertip tilts toward it.
+        </li>
+        <li>
+          <strong>Right thumb + index tap</strong> (while hovering an image) selects it — it animates to the
+          center and grows, while the rest shrink into a row at the bottom.
+        </li>
+        <li>
+          <strong>Same tap on the centered image</strong> deselects it back into the row.
+        </li>
+        <li>
+          <strong>Same tap on a different image</strong> (while one is selected) swaps the selection directly.
+        </li>
+      </ul>
+    </>
+  );
 }

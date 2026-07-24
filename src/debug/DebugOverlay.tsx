@@ -99,11 +99,6 @@ export function DebugOverlay({
         ctx.fillText(CORNER_LABELS[i], corner.x, corner.y - 14);
       });
     }
-
-    ctx.font = 'bold 16px system-ui, sans-serif';
-    ctx.textAlign = 'left';
-    ctx.fillStyle = rightPinkyExtended ? '#3bff6a' : 'rgba(255, 255, 255, 0.5)';
-    ctx.fillText(`PINKY: ${rightPinkyExtended ? 'UP' : 'down'}`, 12, 24);
   }, [result, corners, visible, videoRef, videoSize, rightPinkyExtended, leftHandOpen]);
 
   return <canvas ref={canvasRef} className="debug-overlay" />;
