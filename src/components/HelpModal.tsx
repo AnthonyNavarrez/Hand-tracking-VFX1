@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import './HelpModal.css';
 
-type Tab = 'hand-vfx' | 'tool-2';
+type Tab = 'hand-vfx' | 'image-fx';
 
 type HelpModalProps = {
   onClose: () => void;
@@ -37,16 +37,16 @@ export function HelpModal({ onClose }: HelpModalProps) {
             Hand VFX Lens
           </button>
           <button
-            className={`help-tab ${tab === 'tool-2' ? 'active' : ''}`}
+            className={`help-tab ${tab === 'image-fx' ? 'active' : ''}`}
             type="button"
-            onClick={() => setTab('tool-2')}
+            onClick={() => setTab('image-fx')}
           >
-            Tool 2
+            Image FX
           </button>
         </div>
 
         <div className="help-body">
-          {tab === 'hand-vfx' ? <HandVfxHelp /> : <ToolTwoHelp />}
+          {tab === 'hand-vfx' ? <HandVfxHelp /> : <ImageFxHelp />}
         </div>
       </div>
     </div>
@@ -115,7 +115,7 @@ function HandVfxHelp() {
   );
 }
 
-function ToolTwoHelp() {
+function ImageFxHelp() {
   return (
     <>
       <p className="help-section-title">Gallery visibility</p>

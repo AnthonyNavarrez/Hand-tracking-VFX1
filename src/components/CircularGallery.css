@@ -1,0 +1,10 @@
+.circular-gallery {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+.circular-gallery:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 4px;
+}

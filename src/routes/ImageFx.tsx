@@ -1,29 +1,49 @@
 import { useCamera } from '../context/CameraContext';
 import { useTracking } from '../context/TrackingContext';
-import { useLeftIndexExtended, useLeftMiddleExtended } from '../tracking/gestures';
+import {
+  useLeftIndexExtended,
+  useLeftMiddleExtended,
+  useLeftPinkyExtended,
+  useLeftRingExtended,
+} from '../tracking/gestures';
 import { ImageGallery } from '../components/ImageGallery';
 import { DomeGallery } from '../components/DomeGallery';
+import { CircularGallery } from '../components/CircularGallery';
+import { ScatteredGallery } from '../components/ScatteredGallery';
 import { DebugOverlay } from '../debug/DebugOverlay';
 import '../App.css';
 
-function ToolTwo() {
+function ImageFx() {
   const { videoRef, isReady, error, videoSize } = useCamera();
   const { result: handResult, isModelReady } = useTracking();
   const leftIndexExtended = useLeftIndexExtended(handResult);
   const leftMiddleExtended = useLeftMiddleExtended(handResult);
+  const leftRingExtended = useLeftRingExtended(handResult);
+  const leftPinkyExtended = useLeftPinkyExtended(handResult);
+
+  // Mounted only while its own gate is up, so selection/rotation/scroll/
+  // scatter state always starts fresh on each reveal instead of needing
+  // a separate reset path. Priority when more than one gate is somehow
+  // up at once: pinky > ring > middle > index.
+  const activeGallery = !isReady
+    ? null
+    : leftPinkyExtended
+      ? 'scattered'
+      : leftRingExtended
+        ? 'circular'
+        : leftMiddleExtended
+          ? 'dome'
+          : leftIndexExtended
+            ? 'flat'
+            : null;
 
   return (
     <div className="app">
-      {/* Mounted only while its gate is up, so selection/rotation state
-          always starts fresh on each reveal instead of needing a
-          separate reset path. Dome takes priority over the flat gallery
-          if both gates are somehow up at once. */}
       <div className="stage">
-        {isReady && leftMiddleExtended ? (
-          <DomeGallery />
-        ) : (
-          isReady && leftIndexExtended && <ImageGallery />
-        )}
+        {activeGallery === 'scattered' && <ScatteredGallery />}
+        {activeGallery === 'circular' && <CircularGallery />}
+        {activeGallery === 'dome' && <DomeGallery />}
+        {activeGallery === 'flat' && <ImageGallery />}
         {/* Reused as-is (per plan) — corners/rightPinkyExtended/leftHandOpen
             don't apply here, so passed as null/false/false; this just
             surfaces the tracked hand landmark dots for this route. */}
@@ -45,4 +65,4 @@ function ToolTwo() {
   );
 }
 
-export default ToolTwo;
+export default ImageFx;

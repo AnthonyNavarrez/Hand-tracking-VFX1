@@ -115,7 +115,7 @@ export function useRightMiddleExtended(result: HandLandmarkerResult | null): boo
   );
 }
 
-/** Left index finger raised — Tool 2's gallery visibility gate. Same
+/** Left index finger raised — Image FX's gallery visibility gate. Same
  * ratio/threshold pair as the right index gesture (shared across hands,
  * same anatomy), just pointed at the left hand. */
 export function useLeftIndexExtended(result: HandLandmarkerResult | null): boolean {
@@ -129,7 +129,7 @@ export function useLeftIndexExtended(result: HandLandmarkerResult | null): boole
   );
 }
 
-/** Left middle finger raised — Tool 2's dome-gallery visibility gate.
+/** Left middle finger raised — Image FX's dome-gallery visibility gate.
  * Same ratio/threshold pair as the right middle gesture, pointed at the
  * left hand. */
 export function useLeftMiddleExtended(result: HandLandmarkerResult | null): boolean {
@@ -143,11 +143,18 @@ export function useLeftMiddleExtended(result: HandLandmarkerResult | null): bool
   );
 }
 
-/** Right ring finger raised — Tool 2 dome gallery's rotation-follow
+/** Right ring finger raised — Image FX dome gallery's rotation-follow
  * gesture. Same tip-to-MCP/hand-scale ratio technique as every other
  * single-finger gesture here. */
 export function useRightRingExtended(result: HandLandmarkerResult | null): boolean {
   return useFingerExtended(result, 'Right', RING_TIP, RING_MCP, config.ringExtendedOnRatio, config.ringExtendedOffRatio);
+}
+
+/** Left ring finger raised — Image FX's circular-carousel visibility gate.
+ * Same ratio/threshold pair as the right ring gesture, pointed at the
+ * left hand. */
+export function useLeftRingExtended(result: HandLandmarkerResult | null): boolean {
+  return useFingerExtended(result, 'Left', RING_TIP, RING_MCP, config.ringExtendedOnRatio, config.ringExtendedOffRatio);
 }
 
 /**
@@ -287,7 +294,7 @@ export function getRightHandThumbTip(result: HandLandmarkerResult | null): Norma
 
 /** Raw ring fingertip landmark of the right hand, or null if not tracked
  * — for converting to screen space via landmarkToScreen (see
- * tracking/corners), e.g. to drive Tool 2's dome-gallery rotation-follow. */
+ * tracking/corners), e.g. to drive Image FX's dome-gallery rotation-follow. */
 export function getRightHandRingTip(result: HandLandmarkerResult | null): NormalizedLandmark | null {
   const rightHand = result ? findHandByLabel(result, 'Right') : null;
   return rightHand ? rightHand[RING_TIP] : null;

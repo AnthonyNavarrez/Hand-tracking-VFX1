@@ -164,7 +164,7 @@ export const config = {
   // (0-1) for how quickly that pull engages/releases.
   circleAttractMixFactor: 0.08,
 
-  // Tool 2 gallery: right index/thumb pinch (screen px, on the raw
+  // Image FX gallery: right index/thumb pinch (screen px, on the raw
   // fingertip positions) tap-toggles select/deselect/swap on whichever
   // card is hovered — same tap-to-toggle/hysteresis pattern as the
   // lens's pixelate/dither pinches, scoped separately in case tuning
@@ -172,13 +172,13 @@ export const config = {
   gallerySelectPinchOnDistance: 45,
   gallerySelectPinchOffDistance: 85,
 
-  // Right ring finger raised (Tool 2 dome gallery's rotation-follow
+  // Right ring finger raised (Image FX dome gallery's rotation-follow
   // gesture, and the right-hand gate generally) — same technique/values
   // as the other single-finger gestures.
   ringExtendedOnRatio: 0.75,
   ringExtendedOffRatio: 0.55,
 
-  // Tool 2 dome mode: left middle finger raised swaps the flat gallery
+  // Image FX dome mode: left middle finger raised swaps the flat gallery
   // for a rotating photo dome (ported from React Bits' DomeGallery).
   // Right middle finger raised auto-spins it at this rate; right ring
   // finger raised instead lets its screen-space movement drive rotation
@@ -192,4 +192,21 @@ export const config = {
   // physically over (real 2D containment, unlike the flat gallery's
   // X-only hover rule).
   domeHoverScale: 1.15,
+
+  // Image FX carousel mode: left ring finger raised swaps to a horizontal
+  // circular carousel (ported from React Bits' CircularGallery, text
+  // labels stripped). Right index/thumb pinch (screen px, on the raw
+  // fingertip positions) advances to the next image — same tap-to-
+  // toggle/hysteresis pattern as the other pinches here, scoped
+  // separately since it's a different action (advance, not select) even
+  // though it's the same physical gesture.
+  carouselAdvancePinchOnDistance: 45,
+  carouselAdvancePinchOffDistance: 85,
+
+  // Image FX scattered mode: left pinky raised scatters the images at
+  // random screen positions. Right index finger raised while over a
+  // card selects and immediately drags it (real 2D containment — no
+  // row/grid to reduce to an X-only rule when positions are arbitrary);
+  // it follows the fingertip until the finger lowers. No pinch/thumb
+  // involved.
 };

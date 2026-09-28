@@ -24,8 +24,8 @@ function Dashboard() {
           <Link className="tool-button" to="/hand-vfx">
             Hand VFX Lens
           </Link>
-          <Link className="tool-button" to="/tool-2">
-            Tool 2
+          <Link className="tool-button" to="/image-fx">
+            Image FX
           </Link>
         </div>
         {error && <p className="dashboard-status dashboard-status-error">Camera error: {error}</p>}
